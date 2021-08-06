@@ -1,0 +1,22 @@
+[package]
+name = "asking"
+version = "0.0.1"
+authors = ["Raimundo Saona <rasa200@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/saona-raimundo/asking"
+documentation = "https://docs.rs/asking"
+homepage = "https://crates.io/crates/asking"
+description = """
+Build async prompts.
+"""
+keywords = ["answer", "ask", "cli", "console", "input", "interactive", "prompt", "question", "simple", "text"]
+categories = ["command-line-interface", "command-line-utilities", "data-structures", "encoding", "rust-patterns", "value-formatting"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[dependencies]
