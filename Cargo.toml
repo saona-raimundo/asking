@@ -20,3 +20,6 @@ categories = ["command-line-interface", "command-line-utilities", "data-structur
 maintenance = { status = "actively-developed" }
 
 [dependencies]
+
+[dev-dependencies]
+doc-comment = "0.3.3"
