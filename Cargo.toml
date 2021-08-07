@@ -20,6 +20,9 @@ categories = ["command-line-interface", "command-line-utilities", "data-structur
 maintenance = { status = "actively-developed" }
 
 [dependencies]
+eyre = "0.6.5"
+async-std = "1.9.0"
+chrono = "0.4.19"
 
 [dev-dependencies]
 doc-comment = "0.3.3"

@@ -10,11 +10,16 @@ Build async prompts.
 
 Ever wanted non-blocking user input? Here you are!
 
-## Features
+## Roadmap
 
-- **Async** - You can work while the user inputs something and even timeout!
-- **Common patterns** - Built-in common question patterns including `confirm`, `date`, `select`, `multiselect`, `password`, `text` and more! (TODO: link to the actual structs)
-- **Cross-platform** - It is actually generic on writer and reader!
+- **Common patterns** - Built-in common question patterns including 
+  - `confirm`, 
+  - `date`, 
+  - `select`, 
+  - `multiselect`, 
+  - `password`, 
+  - `text` 
+  - and more! (TODO: link to the actual structs)
 - **Standardized error handling**
 - **Customized help messages** - Help the user input a correct answer.
 - **Default values** - 
@@ -22,13 +27,47 @@ Ever wanted non-blocking user input? Here you are!
 - **Custom formatting** - Display back the input as you wish. (TODO)
 - **Total control** - Any decision can be reprogrammed!
 
+## Features
+
+- **Async** - You can work while the user inputs something and even timeout!
+- **Cross-platform** - It is actually generic on writer and reader!
+
+
 ## Limitations
+
+- **Internal mutability of functions** - All functions passed are `Arc<dyn Fn>`. This  allows both functions and closures, but it means that functions can not hold any mutable references inside.
 
 Let me know about more, I will be happy to add them!
 
 ## Quick example
 
-(TODO)
+(TODO: Add timeout)
+
+```rust
+extern crate chrono;
+use std::time::Duration;
+
+let ans = async {
+    let mut question = asking::yn();
+    question
+        .message("Shall I continue? (you have 5 seconds to answer)")
+        .default_value(true)
+        .timeout(Duration::from_secs(5_u64));
+    question.ask().await
+};
+
+match async_std::task::block_on(ans) {
+    Ok(true) => println!("Super!"),
+    Ok(false) => println!("Okay, shutting down..."),
+    Err(report) => {
+        if report.is::<async_std::future::TimeoutError>() {
+            println!("I think you are not here, I will continue :)")
+        } else {
+            eprintln!("Error with questionnaire, try again later")
+        }
+    }
+}
+```
 
 
 
