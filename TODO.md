@@ -29,6 +29,12 @@ How to save functions?
   - Ordered tests?
     - required test should have priority, no?
 
+## Custom types
+
+### yn
+
+- Develop parser!
+
 ## Tests
 
 - required() // answer not null, check with default value

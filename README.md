@@ -12,30 +12,31 @@ Ever wanted non-blocking user input? Here you are!
 
 ## Roadmap
 
-- **Common patterns** - Built-in common question patterns including 
-  - `confirm`, 
-  - `date`, 
-  - `select`, 
-  - `multiselect`, 
-  - `password`, 
-  - `text` 
-  - and more! (TODO: link to the actual structs)
-- **Standardized error handling**
 - **Customized help messages** - Help the user input a correct answer.
-- **Default values** - 
-- **Validation** - Include tests that the input has to pass.
 - **Custom formatting** - Display back the input as you wish. (TODO)
 - **Total control** - Any decision can be reprogrammed!
 
 ## Features
 
-- **Async** - You can work while the user inputs something and even timeout!
+- **Asynchronous** - You can work while the user inputs something and even timeout!
+- **Common patterns** - Built-in common question patterns including 
+  - `yn` - yes/no questions.
+  - `date` - uses `chrono::naive::NaiveDate`.
+  - `select` - choose one option.
+  - `multiselect` - choose options out of some alternatives.
+  - `text` - just a String
+  - `T: std::str::FromStr` - your own type!
 - **Cross-platform** - It is actually generic on writer and reader!
+- **Default values** - Add a value for empty inputs.
+- **Standardized error handling** - You can manage errors!
+- **Feedback** - Display a message in response to the input.
+- **Validation** - Include tests that the input has to pass.
 
 
 ## Limitations
 
 - **Internal mutability of functions** - All functions passed are `Arc<dyn Fn>`. This  allows both functions and closures, but it means that functions can not hold any mutable references inside.
+- **Consuming methods** - Methods are consuming allowing one-line constructions, while making more difficult complex construction patterns. This is because of the existence of default values. Check out [C-BUILDER](https://rust-lang.github.io/api-guidelines/type-safety.html#c-builder).
 
 Let me know about more, I will be happy to add them!
 
@@ -48,12 +49,9 @@ extern crate chrono;
 use std::time::Duration;
 
 let ans = async {
-    let mut question = asking::yn();
-    question
-        .message("Shall I continue? (you have 5 seconds to answer)")
+    asking::yn().message("Shall I continue? (you have 5 seconds to answer)")
         .default_value(true)
-        .timeout(Duration::from_secs(5_u64));
-    question.ask().await
+        .timeout(Duration::from_secs(5_u64)).ask().await
 };
 
 match async_std::task::block_on(ans) {

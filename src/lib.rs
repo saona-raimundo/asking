@@ -3,6 +3,7 @@
 #[cfg(doctest)]
 doc_comment::doctest!("../README.md");
 
+pub mod error;
 mod question;
 
 pub use question::{QuestionBuilder, StdQuestion};
@@ -39,9 +40,7 @@ pub fn multiple_select<T>(options: &[T]) -> StdQuestion<T> {
 
 ///
 pub fn password() -> StdQuestion<String> {
-    let mut question = StdQuestion::default();
-    question.feedback(|_| "".to_string());
-    question
+    StdQuestion::default().feedback(|_| "".to_string())
 }
 
 ///

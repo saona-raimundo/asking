@@ -3,12 +3,12 @@ use std::time::Duration;
 
 fn main() {
     let ans = async {
-        let mut question = asking::yn();
-        question
+        asking::yn()
             .message("Shall I continue? (you have 5 seconds to answer)")
             .default_value(true)
-            .timeout(Duration::from_secs(5_u64));
-        question.ask().await
+            .timeout(Duration::from_secs(5_u64))
+            .ask()
+            .await
     };
 
     match async_std::task::block_on(ans) {

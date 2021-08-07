@@ -25,10 +25,14 @@ where
             help: (String::default(), bool::default()),
             default: None,
             feedback: Arc::new(|_| String::default()),
-            parser: Arc::new(|s| s.trim_end().parse().map_err(|e| Report::new(e))),
+            parser: (
+                Arc::new(|s| s.trim_end().parse().map_err(|e| Report::new(e))),
+                bool::default(),
+            ),
             tests: Vec::default(),
             timeout: None,
             attempts: None,
+            required: bool::default(),
         }
     }
 }
