@@ -20,16 +20,45 @@ pub struct QuestionBuilder<T, R, W> {
     help: (String, bool),
     default: Option<T>,
     feedback: Arc<dyn Fn(&T) -> String>,
+    preparser: Arc<dyn Fn(String) -> String>,
     parser: (Arc<dyn Fn(&str) -> eyre::Result<T>>, bool),
     tests: Vec<(Arc<dyn Fn(&T) -> eyre::Result<()>>, bool)>,
     timeout: Option<Duration>,
     attempts: Option<usize>,
-    required: bool,
+    required: (String, bool),
+}
+
+impl<T, R, W> QuestionBuilder<T, R, W>
+where
+    T: FromStr,
+    <T as FromStr>::Err: Send + Sync + Error + 'static,
+    R: Read,
+    W: Write,
+{
+    pub fn new(reader: R, writer: W) -> Self {
+        Self {
+            reader: BufReader::new(reader),
+            writer: BufWriter::new(writer),
+            message: (String::default(), bool::default()),
+            help: (String::default(), bool::default()),
+            default: None,
+            feedback: Arc::new(|_| String::default()),
+            preparser: Arc::new(|s| s),
+            parser: (
+                Arc::new(|s| s.parse().map_err(|e| Report::new(e))),
+                bool::default(),
+            ),
+            tests: Vec::default(),
+            timeout: None,
+            attempts: None,
+            required: (String::default(), bool::default()),
+        }
+    }
 }
 
 /// # Message-related
 impl<T, R, W> QuestionBuilder<T, R, W> {
-    pub fn message<O: ToString>(mut self, message: O) -> Self {
+    pub fn message(mut self, message: impl ToString) -> Self {
         self.message.0 = message.to_string();
         self
     }
@@ -37,11 +66,11 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self.message.1 = message_repeat;
         self
     }
-    pub fn repeat_message<O: ToString>(self, message: O) -> Self {
+    pub fn repeat_message(self, message: impl ToString) -> Self {
         self.message(message).message_repeat(true)
     }
 
-    pub fn help<O: ToString>(mut self, help: O) -> Self {
+    pub fn help(mut self, help: impl ToString) -> Self {
         self.help.0 = help.to_string();
         self
     }
@@ -49,7 +78,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self.help.1 = help_repeat;
         self
     }
-    pub fn repeat_help<O: ToString>(self, help: O) -> Self {
+    pub fn repeat_help(self, help: impl ToString) -> Self {
         self.help(help).help_repeat(true)
     }
 }
@@ -107,7 +136,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     ///
     /// # Remarks
     ///
-    /// Default values are tested, so make sure that it is a value that passes your tests!
+    /// Default values are NOT tested, so make sure that it is a value that passes your tests!
     pub fn default_value<S: Into<Option<T>>>(mut self, value: S) -> Self {
         self.default = value.into();
         self
@@ -123,8 +152,19 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self
     }
 
+    pub fn required_with_msg(mut self, required: bool, message: impl ToString) -> Self {
+        self.required = (message.to_string(), required);
+        self
+    }
+
+    /// Requires that the input is not empty to continue.
+    ///
+    /// # Remarks
+    ///
+    /// There is a default mesage that will be displayed, so you might want to overwrite it
+    /// using `required_with_msg`.
     pub fn required(mut self, required: bool) -> Self {
-        self.required = required;
+        self.required.1 = required;
         self
     }
 }
@@ -139,6 +179,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
             help: self.help,
             default: self.default,
             feedback: self.feedback,
+            preparser: self.preparser,
             parser: self.parser,
             tests: self.tests,
             timeout: self.timeout,
@@ -155,6 +196,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
             help: self.help,
             default: self.default,
             feedback: self.feedback,
+            preparser: self.preparser,
             parser: self.parser,
             tests: self.tests,
             timeout: self.timeout,
@@ -164,6 +206,15 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     }
     pub fn feedback(mut self, feedback: impl Fn(&T) -> String + 'static) -> Self {
         self.feedback = Arc::new(feedback);
+        self
+    }
+
+    /// Set the preparser for the input.
+    ///
+    /// This is applied to the raw input before being parsed to `T`.
+    /// In CLI applications, it is useful to clean the leading new line that comes with the input.
+    pub fn preparser(mut self, preparser: impl Fn(String) -> String + 'static) -> Self {
+        self.preparser = Arc::new(preparser);
         self
     }
 
@@ -208,13 +259,11 @@ where
 
     async fn ask_loop(mut self) -> Result<T, crate::error::Processing> {
         loop {
-            println!("Started iteration!");
             self.write_message().await?;
-            let input = self.take_input().await?;
-            println!("input: {:?}", input);
+            let preinput = self.take_input().await?;
+            let input = (self.preparser)(preinput);
             self.decrease_attempts()?;
-            if input.is_empty() && !self.required && self.default.is_some() {
-                println!("Going for the default!");
+            if input.is_empty() && !self.required.1 && self.default.is_some() {
                 return Ok(self.default.unwrap());
             }
             let proposal = match self.parse_input(&input).await {
@@ -257,10 +306,10 @@ where
     }
 
     async fn parse_input(&mut self, input: &str) -> eyre::Result<T> {
-        if input == "" || self.required {
-            Err(crate::error::Looping::Required(
-                "Answer can not be empty.".to_string(),
-            ))?;
+        if input == "" && self.required.1 {
+            self.display_help().await?;
+            write!(self.writer, "{}", self.required.0).await?;
+            self.writer.flush().await?;
         }
         let result = (self.parser.0)(input);
         if let Err(ref e) = result {

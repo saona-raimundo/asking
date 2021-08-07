@@ -6,16 +6,15 @@ fn main() {
     let ans = async {
         asking::yn()
             .message("Shall I continue? (you have 5 seconds to answer)")
-            .default_value(true)
             .feedback(|b| {
                 if *b {
-                    "Great!".to_string()
+                    "Great!\n".to_string()
                 } else {
-                    "Too bad".to_string()
+                    "Too bad\n".to_string()
                 }
             })
-            .help("You can do it!")
-            .quick_test_with_msg(|b| !b, "Think hard!")
+            .help("You can do it!\n")
+            .quick_test_with_msg(|b| !b, "Think hard!\n")
             .required(true)
             .timeout(Duration::from_secs(50_u64))
             .ask()

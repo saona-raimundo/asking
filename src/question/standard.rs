@@ -25,14 +25,15 @@ where
             help: (String::default(), bool::default()),
             default: None,
             feedback: Arc::new(|_| String::default()),
+            preparser: Arc::new(|s| s.trim_end().to_string()),
             parser: (
-                Arc::new(|s| s.trim_end().parse().map_err(|e| Report::new(e))),
+                Arc::new(|s| s.parse().map_err(|e| Report::new(e))),
                 bool::default(),
             ),
             tests: Vec::default(),
             timeout: None,
             attempts: None,
-            required: bool::default(),
+            required: ("This answer is required.\n".to_string(), bool::default()),
         }
     }
 }
