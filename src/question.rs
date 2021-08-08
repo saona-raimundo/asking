@@ -5,7 +5,7 @@ use async_std::{
     },
     sync::Arc,
 };
-use core::str::FromStr;
+use core::{fmt::Debug, str::FromStr};
 use eyre::Report;
 use std::{error::Error, marker::Unpin, string::ToString, time::Duration};
 
@@ -22,7 +22,6 @@ pub use standard::StdQuestionBuilder;
 /// + [Prompt functionalities](#prompt-functionalities)
 /// + [Processing Text Input](#processing-text-input)
 /// + [Advanced Methods](#advanced-methods)
-#[derive()]
 pub struct QuestionBuilder<T, R, W> {
     reader: BufReader<R>,
     writer: BufWriter<W>,
@@ -108,12 +107,6 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 
     pub fn test(self, test: impl Fn(&T) -> bool + 'static) -> Self {
         self.test_with_msg(test, "The value failed a test.\n")
-    }
-
-    /// Add a test over the parsed input whose error is displayed, if one occurs.
-    pub fn test_with_feedback(mut self, test: impl Fn(&T) -> eyre::Result<()> + 'static) -> Self {
-        self.tests.push((Arc::new(test), true));
-        self
     }
 
     pub fn test_with_msg(
@@ -423,15 +416,6 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self.str_test_with_msg(str_test, "The input failed a test before being parsed.")
     }
 
-    /// Add a test over the unparsed input and displays the error, if one occurs.
-    pub fn str_test_with_feedback(
-        mut self,
-        str_test: impl Fn(&str) -> eyre::Result<()> + 'static,
-    ) -> Self {
-        self.str_tests.push((Arc::new(str_test), true));
-        self
-    }
-
     /// Add a test over the unparsed input and shows the message if an error occurs.
     pub fn str_test_with_msg(
         self,
@@ -497,15 +481,6 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self.parser = (Arc::new(parser), false);
         self
     }
-
-    /// Set the parser for the input. Errors will be displayed if they occur.
-    pub fn parser_with_feedback(
-        mut self,
-        parser: impl Fn(&str) -> eyre::Result<T> + 'static,
-    ) -> Self {
-        self.parser = (Arc::new(parser), true);
-        self
-    }
 }
 
 /// # Advanced methods
@@ -544,5 +519,54 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
             attempts: self.attempts,
             required: self.required,
         }
+    }
+
+    /// Add a test over the parsed input whose error is displayed, if one occurs.
+    pub fn test_with_feedback(mut self, test: impl Fn(&T) -> eyre::Result<()> + 'static) -> Self {
+        self.tests.push((Arc::new(test), true));
+        self
+    }
+
+    /// Add a test over the unparsed input and displays the error, if one occurs.
+    pub fn str_test_with_feedback(
+        mut self,
+        str_test: impl Fn(&str) -> eyre::Result<()> + 'static,
+    ) -> Self {
+        self.str_tests.push((Arc::new(str_test), true));
+        self
+    }
+
+    /// Set the parser for the input. Errors will be displayed if they occur.
+    pub fn parser_with_feedback(
+        mut self,
+        parser: impl Fn(&str) -> eyre::Result<T> + 'static,
+    ) -> Self {
+        self.parser = (Arc::new(parser), true);
+        self
+    }
+}
+
+impl<T, R, W> Debug for QuestionBuilder<T, R, W>
+where
+    T: Debug,
+    R: Read + Debug,
+    W: Write + Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("QuestionBuilder")
+            .field("reader", &self.reader)
+            .field("writer", &self.writer)
+            .field("message", &self.message)
+            .field("help", &self.help)
+            .field("default", &self.default)
+            .field("timeout", &self.timeout)
+            .field("attempts", &self.attempts)
+            .field("required", &self.required)
+            .finish_non_exhaustive()
+        // .field("feedback", &self.feedback)
+        // .field("preparser", &self.preparser)
+        // .field("str_tests", &self.str_tests)
+        // .field("parser", &self.parser)
+        // .field("tests", &self.tests)
     }
 }
