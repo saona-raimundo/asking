@@ -41,12 +41,19 @@ pub struct QuestionBuilder<T, R, W> {
 /// # Constructor
 impl<T, R, W> QuestionBuilder<T, R, W>
 where
-    T: FromStr,
-    <T as FromStr>::Err: Send + Sync + Error + 'static,
     R: Read,
     W: Write,
 {
-    pub fn new(reader: R, writer: W) -> Self {
+    /// Constructs a new `QuestionBuilder<T, R, W>` with a default `preparser`.
+    ///
+    /// # Remarks
+    ///
+    /// The `preparser` trims the end of the input. To override this, use the `preparser` method.
+    pub fn new<F, E>(reader: R, writer: W, parser: F) -> Self
+    where
+        F: Fn(&str) -> Result<T, E> + 'static,
+        E: Error + Send + Sync + 'static,
+    {
         Self {
             reader: BufReader::new(reader),
             writer: BufWriter::new(writer),
@@ -54,7 +61,42 @@ where
             help: (String::default(), bool::default()),
             default: None,
             feedback: Arc::new(|_| String::default()),
-            preparser: Arc::new(|s| s),
+            preparser: Arc::new(|s| s.trim_end().to_string()),
+            str_tests: Vec::default(),
+            parser: (
+                Arc::new(move |s| parser(s).map_err(|e| Report::new(e))),
+                bool::default(),
+            ),
+            tests: Vec::default(),
+            timeout: None,
+            attempts: None,
+            required: (String::default(), bool::default()),
+        }
+    }
+}
+
+impl<T, R, W> QuestionBuilder<T, R, W>
+where
+    T: FromStr,
+    <T as FromStr>::Err: Send + Sync + Error + 'static,
+    R: Read,
+    W: Write,
+{
+    /// Constructs a new `QuestionBuilder<T, R, W>` with a default `preparser`.
+    /// The parser is given by the implementation of `FromStr`.
+    ///
+    /// # Remarks
+    ///
+    /// The `preparser` trims the end of the input. To override this, use the `preparser` method.
+    pub fn new_fromstr(reader: R, writer: W) -> Self {
+        Self {
+            reader: BufReader::new(reader),
+            writer: BufWriter::new(writer),
+            message: (String::default(), bool::default()),
+            help: (String::default(), bool::default()),
+            default: None,
+            feedback: Arc::new(|_| String::default()),
+            preparser: Arc::new(|s| s.trim_end().to_string()),
             str_tests: Vec::default(),
             parser: (
                 Arc::new(|s| s.parse().map_err(|e| Report::new(e))),
@@ -140,7 +182,7 @@ where
     where
         I: IntoIterator<Item = T> + 'static,
     {
-        self.inside_with_msg(iterator, "Value is not one of the options.")
+        self.inside_with_msg(iterator, "Value is not one of the options.\n")
     }
 
     /// Test if the value is inside an iterator
@@ -161,7 +203,7 @@ where
 
     /// Test if the value is at most `upper_bound`.
     pub fn max(self, upper_bound: T) -> Self {
-        self.max_with_msg(upper_bound, "The value can not be so big.")
+        self.max_with_msg(upper_bound, "The value can not be so big.\n")
     }
 
     /// Test if the value is at most `upper_bound`.
@@ -171,8 +213,8 @@ where
 
     /// Test if the value is between `lower_bound` and `upper_bound`, including borders.
     pub fn min_max(self, lower_bound: T, upper_bound: T) -> Self {
-        self.min_with_msg(lower_bound, "The value can not be so small.")
-            .max_with_msg(upper_bound, "The value can not be so big.")
+        self.min_with_msg(lower_bound, "The value can not be so small.\n")
+            .max_with_msg(upper_bound, "The value can not be so big.\n")
     }
 
     /// Test if the value is between `lower_bound` and `upper_bound`, including borders.
@@ -190,7 +232,7 @@ where
 
     /// Test if the value is at least `lower_bound`.
     pub fn min(self, lower_bound: T) -> Self {
-        self.min_with_msg(lower_bound, "The value can not be so small.")
+        self.min_with_msg(lower_bound, "The value can not be so small.\n")
     }
 
     /// Test if the value is at least `lower_bound`.
@@ -200,7 +242,7 @@ where
 
     /// Test if the value is not `other`.
     pub fn not(self, other: T) -> Self {
-        self.not_with_msg(other, "This value is not allowed.")
+        self.not_with_msg(other, "This value is not allowed.\n")
     }
 
     /// Test if the value is not `other`.
@@ -257,8 +299,6 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 /// # Prompt functionalities
 impl<T, R, W> QuestionBuilder<T, R, W>
 where
-    T: FromStr,
-    <T as FromStr>::Err: Send + Sync + Error + 'static,
     W: Write + Unpin,
     R: Read + Unpin,
 {
@@ -331,7 +371,7 @@ where
             let result = (str_test.0)(str_proposal);
             if let Err(ref e) = result {
                 if str_test.1 {
-                    write!(self.writer, "{}", e).await?;
+                    write!(self.writer, "{}\n", e).await?;
                     self.writer.flush().await?;
                 }
                 self.display_help().await?;
@@ -344,14 +384,14 @@ where
     async fn parse_input(&mut self, input: &str) -> eyre::Result<T> {
         if input == "" && self.required.1 {
             self.display_help().await?;
-            write!(self.writer, "{}", self.required.0).await?;
+            write!(self.writer, "{}\n", self.required.0).await?;
             self.writer.flush().await?;
         }
         let result = (self.parser.0)(input);
         if let Err(ref e) = result {
             self.display_help().await?;
             if self.parser.1 {
-                write!(self.writer, "{}", e).await?;
+                write!(self.writer, "{}\n", e).await?;
                 self.writer.flush().await?;
             }
         }
@@ -361,13 +401,13 @@ where
     async fn test_proposal(&mut self, proposal: &T) -> eyre::Result<()> {
         for test in &self.tests {
             let result = (test.0)(proposal);
-            if let Err(ref e) = result {
+            if let Err(e) = result {
                 if test.1 {
-                    write!(self.writer, "{}", e).await?;
+                    write!(self.writer, "{}\n", e).await?;
                     self.writer.flush().await?;
                 }
                 self.display_help().await?;
-                return result;
+                return Err(e);
             }
         }
         Ok(())
@@ -413,7 +453,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     ///
     /// There is a default message that you might want to overwrite with `str_test_with_msg`.
     pub fn str_test(self, str_test: impl Fn(&str) -> bool + 'static) -> Self {
-        self.str_test_with_msg(str_test, "The input failed a test before being parsed.")
+        self.str_test_with_msg(str_test, "The input failed a test before being parsed.\n")
     }
 
     /// Add a test over the unparsed input and shows the message if an error occurs.
@@ -434,7 +474,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     pub fn length(self, exact_length: usize) -> Self {
         self.length_with_msg(
             exact_length,
-            format!("The input needs to have length exactly {}.", exact_length),
+            format!("The input needs to have length exactly {}.\n", exact_length),
         )
     }
 
@@ -449,7 +489,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     pub fn max_length(self, max_length: usize) -> Self {
         self.length_with_msg(
             max_length,
-            format!("The input needs to have length at most {}.", max_length),
+            format!("The input needs to have length at most {}.\n", max_length),
         )
     }
 
@@ -464,7 +504,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     pub fn min_length(self, min_length: usize) -> Self {
         self.length_with_msg(
             min_length,
-            format!("The input needs to have length at least {}.", min_length),
+            format!("The input needs to have length at least {}.\n", min_length),
         )
     }
 
@@ -475,8 +515,6 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     }
 
     /// Set the parser for the input. Errors will NOT be displayed if they occur.
-    ///
-    /// This is shorthand for `self.parser_with_msg(parser, false)`.
     pub fn parser(mut self, parser: impl Fn(&str) -> eyre::Result<T> + 'static) -> Self {
         self.parser = (Arc::new(parser), false);
         self
@@ -521,9 +559,20 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         }
     }
 
-    /// Add a test over the parsed input whose error is displayed, if one occurs.
-    pub fn test_with_feedback(mut self, test: impl Fn(&T) -> eyre::Result<()> + 'static) -> Self {
-        self.tests.push((Arc::new(test), true));
+    /// Toggle the feedback from the parser.
+    ///
+    /// If activated, errors from parsing will be displayed.
+    pub fn parser_feedback_toggle(mut self) -> Self {
+        self.parser.1 = !self.parser.1;
+        self
+    }
+
+    /// Set the parser for the input. Errors will be displayed if they occur.
+    pub fn parser_with_feedback(
+        mut self,
+        parser: impl Fn(&str) -> eyre::Result<T> + 'static,
+    ) -> Self {
+        self.parser = (Arc::new(parser), true);
         self
     }
 
@@ -536,12 +585,9 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self
     }
 
-    /// Set the parser for the input. Errors will be displayed if they occur.
-    pub fn parser_with_feedback(
-        mut self,
-        parser: impl Fn(&str) -> eyre::Result<T> + 'static,
-    ) -> Self {
-        self.parser = (Arc::new(parser), true);
+    /// Add a test over the parsed input whose error is displayed, if one occurs.
+    pub fn test_with_feedback(mut self, test: impl Fn(&T) -> eyre::Result<()> + 'static) -> Self {
+        self.tests.push((Arc::new(test), true));
         self
     }
 }
@@ -563,10 +609,5 @@ where
             .field("attempts", &self.attempts)
             .field("required", &self.required)
             .finish_non_exhaustive()
-        // .field("feedback", &self.feedback)
-        // .field("preparser", &self.preparser)
-        // .field("str_tests", &self.str_tests)
-        // .field("parser", &self.parser)
-        // .field("tests", &self.tests)
     }
 }

@@ -13,8 +13,8 @@ fn main() {
                 }
             })
             .help("You can do it!\n")
-            .quick_test_with_msg(|b| !b, "Think hard!\n")
-            .required(true)
+            .test_with_msg(|b| !b, "Think hard!\n")
+            .required()
             .timeout(Duration::from_secs(50_u64))
             .ask()
             .await

@@ -25,7 +25,6 @@ Ever wanted non-blocking user input? Here you are!
 - **Default values** - Add a value for empty inputs.
 - **Standardized error handling** - You can manage errors!
 - **Feedback** - Display a message in response to the input.
-- **Total control** - At the end of the day, any decision can be reprogrammed!
 - **Validation** - Include tests that the input has to pass.
 
 

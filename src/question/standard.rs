@@ -1,10 +1,8 @@
 use async_std::{
     io,
-    io::{BufReader, BufWriter, Stdin, Stdout},
-    sync::Arc,
+    io::{Stdin, Stdout},
 };
 use core::str::FromStr;
-use eyre::Report;
 use std::error::Error;
 
 use crate::QuestionBuilder;
@@ -12,29 +10,23 @@ use crate::QuestionBuilder;
 /// Question in the standard input/output of the current process.
 pub type StdQuestionBuilder<T> = QuestionBuilder<T, Stdin, Stdout>;
 
+/// # Constructors
+impl<T, F, E> From<F> for StdQuestionBuilder<T>
+where
+    F: Fn(&str) -> Result<T, E> + 'static,
+    E: Error + Send + Sync + 'static,
+{
+    fn from(parser: F) -> Self {
+        QuestionBuilder::new(io::stdin(), io::stdout(), parser)
+    }
+}
+
 impl<T> Default for StdQuestionBuilder<T>
 where
     T: FromStr,
     <T as FromStr>::Err: Send + Sync + Error + 'static,
 {
     fn default() -> Self {
-        StdQuestionBuilder {
-            reader: BufReader::new(io::stdin()),
-            writer: BufWriter::new(io::stdout()),
-            message: (String::default(), bool::default()),
-            help: (String::default(), bool::default()),
-            default: None,
-            feedback: Arc::new(|_| String::default()),
-            preparser: Arc::new(|s| s.trim_end().to_string()),
-            str_tests: Vec::default(),
-            parser: (
-                Arc::new(|s| s.parse().map_err(|e| Report::new(e))),
-                bool::default(),
-            ),
-            tests: Vec::default(),
-            timeout: None,
-            attempts: None,
-            required: ("This answer is required.\n".to_string(), bool::default()),
-        }
+        StdQuestionBuilder::new_fromstr(io::stdin(), io::stdout())
     }
 }

@@ -1,6 +1,6 @@
 use crate::StdQuestionBuilder;
+use chrono::naive::NaiveDate;
 use core::str::FromStr;
-// use eyre::Report;
 use std::error::Error;
 
 ///
@@ -28,7 +28,6 @@ pub fn yn() -> StdQuestionBuilder<bool> {
     })
 }
 
-use chrono::naive::NaiveDate;
 ///
 pub fn date() -> StdQuestionBuilder<NaiveDate> {
     StdQuestionBuilder::default()
