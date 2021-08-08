@@ -16,8 +16,7 @@ Ever wanted non-blocking user input? Here you are!
 - **Common patterns** - Built-in common question patterns including 
   - `yn` - yes/no questions.
   - `date` - uses `chrono::naive::NaiveDate`.
-  - `select` - choose one option. (TODO)
-  - `multiselect` - choose options out of some alternatives. (TODO)
+  - `select` - choose one option.
   - `text` - just a String
   - `T: std::str::FromStr` - your own type!
 - **Cross-platform** - It is actually generic on writer and reader!
@@ -80,6 +79,8 @@ Check out [more examples](https://github.com/saona-raimundo/asking/tree/main/exa
 ## Optional features
 
 (TODO)
+
+- **date** - 
 
 ## Related crates
 

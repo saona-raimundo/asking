@@ -10,15 +10,15 @@ use std::error::Error;
 use crate::QuestionBuilder;
 
 /// Question in the standard input/output of the current process.
-pub type StdQuestion<T> = QuestionBuilder<T, Stdin, Stdout>;
+pub type StdQuestionBuilder<T> = QuestionBuilder<T, Stdin, Stdout>;
 
-impl<T> Default for StdQuestion<T>
+impl<T> Default for StdQuestionBuilder<T>
 where
     T: FromStr,
     <T as FromStr>::Err: Send + Sync + Error + 'static,
 {
     fn default() -> Self {
-        StdQuestion {
+        StdQuestionBuilder {
             reader: BufReader::new(io::stdin()),
             writer: BufWriter::new(io::stdout()),
             message: (String::default(), bool::default()),
