@@ -1,4 +1,3 @@
-extern crate chrono;
 use asking::error::Processing;
 use std::time::Duration;
 

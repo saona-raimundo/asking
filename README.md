@@ -10,26 +10,23 @@ Build async prompts.
 
 Ever wanted non-blocking user input? Here you are!
 
-## Roadmap
-
-- **Customized help messages** - Help the user input a correct answer.
-- **Custom formatting** - Display back the input as you wish. (TODO)
-- **Total control** - Any decision can be reprogrammed!
-
 ## Features
 
 - **Asynchronous** - You can work while the user inputs something and even timeout!
 - **Common patterns** - Built-in common question patterns including 
   - `yn` - yes/no questions.
   - `date` - uses `chrono::naive::NaiveDate`.
-  - `select` - choose one option.
-  - `multiselect` - choose options out of some alternatives.
+  - `select` - choose one option. (TODO)
+  - `multiselect` - choose options out of some alternatives. (TODO)
   - `text` - just a String
   - `T: std::str::FromStr` - your own type!
 - **Cross-platform** - It is actually generic on writer and reader!
+- **Help messages** - Help the user input a correct answer.
+- **Feedback** - Give feedback to the user after the input has been correctly processed!
 - **Default values** - Add a value for empty inputs.
 - **Standardized error handling** - You can manage errors!
 - **Feedback** - Display a message in response to the input.
+- **Total control** - At the end of the day, any decision can be reprogrammed!
 - **Validation** - Include tests that the input has to pass.
 
 
@@ -42,29 +39,34 @@ Let me know about more, I will be happy to add them!
 
 ## Quick example
 
-(TODO: Add timeout)
+Give only five seconds to the user to confirm something, and continue upon no input!
 
 ```rust
-extern crate chrono;
+use asking::error::Processing;
 use std::time::Duration;
 
-let ans = async {
-    asking::yn().message("Shall I continue? (you have 5 seconds to answer)")
-        .default_value(true)
-        .timeout(Duration::from_secs(5_u64)).ask().await
-};
+fn main() {
+    let ans = async {
+        asking::yn()
+            .message("Shall I continue? (you have 5 seconds to answer)")
+            .default_value(true) // value upon simple ENTER
+            .timeout(Duration::from_secs(5_u64))
+            .ask()
+            .await
+    };
 
-match async_std::task::block_on(ans) {
-    Ok(true) => println!("Super!"),
-    Ok(false) => println!("Okay, shutting down..."),
-    Err(report) => {
-        if report.is::<async_std::future::TimeoutError>() {
-            println!("I think you are not here, I will continue :)")
-        } else {
-            eprintln!("Error with questionnaire, try again later")
-        }
+    match async_std::task::block_on(ans) { // we decide to just wait, at most five secs
+        Ok(true) => println!("Super!"),
+        Ok(false) => println!("Okay, shutting down..."),
+        Err(p) => match p {
+            Processing::Timeout { .. } => {
+                println!("I think you are not here, I will continue :)") // Automatic decision!
+            }
+            _ => eprintln!("Error with questionnaire, try again later"),
+        },
     }
 }
+
 ```
 
 

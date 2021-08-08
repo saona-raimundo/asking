@@ -21,6 +21,7 @@ pub struct QuestionBuilder<T, R, W> {
     default: Option<T>,
     feedback: Arc<dyn Fn(&T) -> String>,
     preparser: Arc<dyn Fn(String) -> String>,
+    str_tests: Vec<(Arc<dyn Fn(&str) -> eyre::Result<()>>, bool)>,
     parser: (Arc<dyn Fn(&str) -> eyre::Result<T>>, bool),
     tests: Vec<(Arc<dyn Fn(&T) -> eyre::Result<()>>, bool)>,
     timeout: Option<Duration>,
@@ -44,6 +45,7 @@ where
             default: None,
             feedback: Arc::new(|_| String::default()),
             preparser: Arc::new(|s| s),
+            str_tests: Vec::default(),
             parser: (
                 Arc::new(|s| s.parse().map_err(|e| Report::new(e))),
                 bool::default(),
@@ -83,37 +85,33 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     }
 }
 
-/// # Test-related
+/// # Testing value
 impl<T, R, W> QuestionBuilder<T, R, W> {
-    /// Add a test over the parsed input and choose to display the error, if one occurs.
-    pub fn test_with_msg(
-        mut self,
-        test: impl Fn(&T) -> eyre::Result<()> + 'static,
-        display_err: bool,
-    ) -> Self {
-        self.tests.push((Arc::new(test), display_err));
-        self
-    }
-
-    /// Add a test over the parsed input. Errors will not be displayed if they occur.
-    ///
-    /// This is shorthand for `self.test_with_msg(parser, false)`.
-    pub fn test(self, test: impl Fn(&T) -> eyre::Result<()> + 'static) -> Self {
-        self.test_with_msg(test, false)
-    }
-
     /// Forgets all tests.
     pub fn clear(mut self) -> Self {
         self.tests = vec![];
         self
     }
 
+    /// Add a test over the parsed input. Errors will not be displayed if they occur.
+    ///
+    /// # Remark
+    ///
+    /// We encourage to write tests whose error should be displayed to the user,
+    /// and add them with the `test_with_msg` method.
+    pub fn test(mut self, test: impl Fn(&T) -> eyre::Result<()> + 'static) -> Self {
+        self.tests.push((Arc::new(test), false));
+        self
+    }
+
+    /// Add a test over the parsed input whose error is displayed, if one occurs.
+    pub fn test_with_feedback(mut self, test: impl Fn(&T) -> eyre::Result<()> + 'static) -> Self {
+        self.tests.push((Arc::new(test), true));
+        self
+    }
+
     pub fn quick_test(self, quick_test: impl Fn(&T) -> bool + 'static) -> Self {
-        let test = move |value: &T| match quick_test(value) {
-            true => Ok(()),
-            false => Err(Report::msg("Failed a test.")),
-        };
-        self.test(test)
+        self.quick_test_with_msg(quick_test, "The value failed a test.")
     }
 
     pub fn quick_test_with_msg(
@@ -123,12 +121,99 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     ) -> Self {
         let test = move |value: &T| match quick_test(value) {
             true => Ok(()),
-            false => Err(Report::msg("Failed a test.").wrap_err(message.to_string())),
+            false => Err(Report::msg(message.to_string())),
         };
-        self.test(test)
+        self.test_with_feedback(test)
+    }
+}
+
+/// # Testing values with more type constrains.
+///
+/// # Remarks
+///
+/// Not all bounds are used in all methods. Open an issue in GitHub if this is a problem for you.
+impl<T, R, W> QuestionBuilder<T, R, W>
+where
+    T: PartialEq + 'static + PartialOrd,
+{
+    /// Test if the value is inside an iterator
+    ///
+    /// # Remarks
+    ///
+    /// To prevent infinite loops, make sure `iterator` is finite.
+    pub fn inside<I>(self, iterator: I) -> Self
+    where
+        I: IntoIterator<Item = T> + Clone + 'static,
+    {
+        self.quick_test_with_msg(
+            move |value: &T| iterator.clone().into_iter().any(|option| option == *value),
+            "Value is not one of the options.",
+        )
     }
 
-    // TODO: more test options
+    /// Test if the value is inside an iterator
+    ///
+    /// # Remarks
+    ///
+    /// To prevent infinite loops, make sure `iterator` is finite.
+    pub fn inside_with_msg<I>(self, iterator: I, message: impl ToString + 'static) -> Self
+    where
+        I: IntoIterator<Item = T> + Clone + 'static,
+    {
+        self.quick_test_with_msg(
+            move |value: &T| iterator.clone().into_iter().any(|option| option == *value),
+            message,
+        )
+    }
+
+    /// Test if the value is at most `upper_bound`.
+    pub fn max(self, upper_bound: T) -> Self {
+        self.max_with_msg(upper_bound, "The value can not be so big.")
+    }
+
+    /// Test if the value is at most `upper_bound`.
+    pub fn max_with_msg(self, upper_bound: T, message: impl ToString + 'static) -> Self {
+        self.quick_test_with_msg(move |value: &T| *value <= upper_bound, message)
+    }
+
+    /// Test if the value is between `lower_bound` and `upper_bound`, including borders.
+    pub fn min_max(self, lower_bound: T, upper_bound: T) -> Self {
+        self.min_with_msg(lower_bound, "The value can not be so small.")
+            .max_with_msg(upper_bound, "The value can not be so big.")
+    }
+
+    /// Test if the value is between `lower_bound` and `upper_bound`, including borders.
+    pub fn min_max_with_msg(
+        self,
+        lower_bound: T,
+        upper_bound: T,
+        message: impl ToString + 'static,
+    ) -> Self {
+        self.quick_test_with_msg(
+            move |value: &T| (lower_bound <= *value) && (*value <= upper_bound),
+            message,
+        )
+    }
+
+    /// Test if the value is at least `lower_bound`.
+    pub fn min(self, lower_bound: T) -> Self {
+        self.min_with_msg(lower_bound, "The value can not be so small.")
+    }
+
+    /// Test if the value is at least `lower_bound`.
+    pub fn min_with_msg(self, lower_bound: T, message: impl ToString + 'static) -> Self {
+        self.quick_test_with_msg(move |value: &T| *value >= lower_bound, message)
+    }
+
+    /// Test if the value is not `other`.
+    pub fn not(self, other: T) -> Self {
+        self.not_with_msg(other, "This value is not allowed.")
+    }
+
+    /// Test if the value is not `other`.
+    pub fn not_with_msg(self, other: T, message: impl ToString + 'static) -> Self {
+        self.quick_test_with_msg(move |value: &T| *value != other, message)
+    }
 }
 
 /// # Useful
@@ -167,48 +252,21 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self.required.1 = required;
         self
     }
-}
 
-/// # Advanced methods
-impl<T, R, W> QuestionBuilder<T, R, W> {
-    pub fn reader<R2: Read + Unpin>(self, other_reader: R2) -> QuestionBuilder<T, R2, W> {
-        QuestionBuilder {
-            reader: BufReader::new(other_reader),
-            writer: self.writer,
-            message: self.message,
-            help: self.help,
-            default: self.default,
-            feedback: self.feedback,
-            preparser: self.preparser,
-            parser: self.parser,
-            tests: self.tests,
-            timeout: self.timeout,
-            attempts: self.attempts,
-            required: self.required,
-        }
-    }
-
-    pub fn writer<W2: Write + Unpin>(self, other_writer: W2) -> QuestionBuilder<T, R, W2> {
-        QuestionBuilder {
-            reader: self.reader,
-            writer: BufWriter::new(other_writer),
-            message: self.message,
-            help: self.help,
-            default: self.default,
-            feedback: self.feedback,
-            preparser: self.preparser,
-            parser: self.parser,
-            tests: self.tests,
-            timeout: self.timeout,
-            attempts: self.attempts,
-            required: self.required,
-        }
-    }
     pub fn feedback(mut self, feedback: impl Fn(&T) -> String + 'static) -> Self {
         self.feedback = Arc::new(feedback);
         self
     }
+}
 
+/// # Processing text input
+///
+/// ## Remarks
+///
+/// This is done after applying the preparser and before parsing the input.
+/// Therefore, the changes the preparser process (like triming trailing space)
+/// do not count for the length of the input.
+impl<T, R, W> QuestionBuilder<T, R, W> {
     /// Set the preparser for the input.
     ///
     /// This is applied to the raw input before being parsed to `T`.
@@ -218,21 +276,102 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self
     }
 
-    /// Set the parser for the input and choose to display the error, if one occurs while parsing.
-    pub fn parser_with_msg(
-        mut self,
-        parser: impl Fn(&str) -> eyre::Result<T> + 'static,
-        display_err: bool,
-    ) -> Self {
-        self.parser = (Arc::new(parser), display_err);
+    /// Add a test over the unparsed input. Errors will not be displayed if they occur.
+    ///
+    /// This is shorthand for `self.test_with_msg(parser, false)`.
+    pub fn str_test(mut self, str_test: impl Fn(&str) -> eyre::Result<()> + 'static) -> Self {
+        self.str_tests.push((Arc::new(str_test), false));
         self
+    }
+
+    /// Add a test over the unparsed input displays the error, if one occurs.
+    pub fn str_test_with_feedback(
+        mut self,
+        str_test: impl Fn(&str) -> eyre::Result<()> + 'static,
+    ) -> Self {
+        self.str_tests.push((Arc::new(str_test), true));
+        self
+    }
+
+    pub fn quick_str_test(self, quick_str_test: impl Fn(&str) -> bool + 'static) -> Self {
+        self.quick_str_test_with_msg(
+            quick_str_test,
+            "The input failed a test before being parsed.",
+        )
+    }
+
+    pub fn quick_str_test_with_msg(
+        self,
+        quick_str_test: impl Fn(&str) -> bool + 'static,
+        message: impl ToString + 'static,
+    ) -> Self {
+        let str_test = move |s: &str| match quick_str_test(s) {
+            true => Ok(()),
+            false => Err(Report::msg(message.to_string())),
+        };
+        self.str_test(str_test)
+    }
+
+    /// Tests that the input length is equal to `exact_length`.
+    ///
+    pub fn length(self, exact_length: usize) -> Self {
+        self.length_with_msg(
+            exact_length,
+            format!("The input needs to have length exactly {}.", exact_length),
+        )
+    }
+
+    /// Tests that the input length is equal to `exact_length`.
+    ///
+    pub fn length_with_msg(self, exact_length: usize, message: impl ToString + 'static) -> Self {
+        self.quick_str_test_with_msg(move |s: &str| s.len() == exact_length, message)
+    }
+
+    /// Tests that the input length is less or equal to `max_length`.
+    ///
+    pub fn max_length(self, max_length: usize) -> Self {
+        self.length_with_msg(
+            max_length,
+            format!("The input needs to have length at most {}.", max_length),
+        )
+    }
+
+    /// Tests that the input length is less or equal to `max_length`.
+    ///
+    pub fn max_length_with_msg(self, max_length: usize, message: impl ToString + 'static) -> Self {
+        self.quick_str_test_with_msg(move |s: &str| s.len() <= max_length, message)
+    }
+
+    /// Tests that the input length is greater or equal to `min_length`.
+    ///
+    pub fn min_length(self, min_length: usize) -> Self {
+        self.length_with_msg(
+            min_length,
+            format!("The input needs to have length at least {}.", min_length),
+        )
+    }
+
+    /// Tests that the input length is greater or equal to `min_length`.
+    ///
+    pub fn min_length_with_msg(self, min_length: usize, message: impl ToString + 'static) -> Self {
+        self.quick_str_test_with_msg(move |s: &str| s.len() >= min_length, message)
     }
 
     /// Set the parser for the input. Errors will not be displayed if they occur.
     ///
     /// This is shorthand for `self.parser_with_msg(parser, false)`.
-    pub fn parser(self, parser: impl Fn(&str) -> eyre::Result<T> + 'static) -> Self {
-        self.parser_with_msg(parser, false)
+    pub fn parser(mut self, parser: impl Fn(&str) -> eyre::Result<T> + 'static) -> Self {
+        self.parser = (Arc::new(parser), false);
+        self
+    }
+
+    /// Set the parser for the input and choose to display the error, if one occurs while parsing.
+    pub fn parser_with_feedback(
+        mut self,
+        parser: impl Fn(&str) -> eyre::Result<T> + 'static,
+    ) -> Self {
+        self.parser = (Arc::new(parser), true);
+        self
     }
 }
 
@@ -261,8 +400,11 @@ where
         loop {
             self.write_message().await?;
             let preinput = self.take_input().await?;
-            let input = (self.preparser)(preinput);
             self.decrease_attempts()?;
+            let input = (self.preparser)(preinput);
+            if self.test_string(&input).await.is_err() {
+                continue;
+            };
             if input.is_empty() && !self.required.1 && self.default.is_some() {
                 return Ok(self.default.unwrap());
             }
@@ -302,6 +444,21 @@ where
                 self.attempts = Some(left_attempts - 1);
             }
         };
+        Ok(())
+    }
+
+    async fn test_string(&mut self, str_proposal: &str) -> eyre::Result<()> {
+        for str_test in &self.str_tests {
+            let result = (str_test.0)(str_proposal);
+            if let Err(ref e) = result {
+                if str_test.1 {
+                    write!(self.writer, "{}", e).await?;
+                    self.writer.flush().await?;
+                }
+                self.display_help().await?;
+                return result;
+            }
+        }
         Ok(())
     }
 
@@ -351,5 +508,44 @@ where
         write!(self.writer, "{}", (self.feedback)(value)).await?;
         self.writer.flush().await?;
         Ok(())
+    }
+}
+
+/// # Advanced methods
+impl<T, R, W> QuestionBuilder<T, R, W> {
+    pub fn reader<R2: Read + Unpin>(self, other_reader: R2) -> QuestionBuilder<T, R2, W> {
+        QuestionBuilder {
+            reader: BufReader::new(other_reader),
+            writer: self.writer,
+            message: self.message,
+            help: self.help,
+            default: self.default,
+            feedback: self.feedback,
+            preparser: self.preparser,
+            str_tests: self.str_tests,
+            parser: self.parser,
+            tests: self.tests,
+            timeout: self.timeout,
+            attempts: self.attempts,
+            required: self.required,
+        }
+    }
+
+    pub fn writer<W2: Write + Unpin>(self, other_writer: W2) -> QuestionBuilder<T, R, W2> {
+        QuestionBuilder {
+            reader: self.reader,
+            writer: BufWriter::new(other_writer),
+            message: self.message,
+            help: self.help,
+            default: self.default,
+            feedback: self.feedback,
+            preparser: self.preparser,
+            str_tests: self.str_tests,
+            parser: self.parser,
+            tests: self.tests,
+            timeout: self.timeout,
+            attempts: self.attempts,
+            required: self.required,
+        }
     }
 }

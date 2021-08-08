@@ -1,4 +1,4 @@
-extern crate chrono;
+use asking::error::Processing;
 use std::time::Duration;
 
 fn main() {
@@ -14,12 +14,11 @@ fn main() {
     match async_std::task::block_on(ans) {
         Ok(true) => println!("Super!"),
         Ok(false) => println!("Okay, shutting down..."),
-        Err(report) => {
-            if report.is::<async_std::future::TimeoutError>() {
+        Err(p) => match p {
+            Processing::Timeout { .. } => {
                 println!("I think you are not here, I will continue :)")
-            } else {
-                eprintln!("Error with questionnaire, try again later")
             }
-        }
+            _ => eprintln!("Error with questionnaire, try again later"),
+        },
     }
 }

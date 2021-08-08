@@ -26,6 +26,7 @@ where
             default: None,
             feedback: Arc::new(|_| String::default()),
             preparser: Arc::new(|s| s.trim_end().to_string()),
+            str_tests: Vec::default(),
             parser: (
                 Arc::new(|s| s.parse().map_err(|e| Report::new(e))),
                 bool::default(),
