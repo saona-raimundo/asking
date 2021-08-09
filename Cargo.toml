@@ -28,4 +28,5 @@ thiserror = "1.0.26"
 [dev-dependencies]
 doc-comment = "0.3.3"
 rand = "0.8.4"
-async-std = { version = "1.9.0", features = ["attributes"] }
+async-std = { version = "1.9.0", features = ["attributes", "unstable"] }
+async-dup = "1.2.2"

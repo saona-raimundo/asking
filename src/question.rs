@@ -390,7 +390,8 @@ where
     }
 
     async fn write_message(&mut self) -> Result<(), std::io::Error> {
-        write!(self.writer, "{}", &self.message.0).await?;
+        // write!(self.writer, "{}", &self.message.0).await?;//////////////////////////////////////////////////
+        self.writer.write(self.message.0.as_bytes()).await?;
         self.writer.flush().await?;
         if !self.message.1 {
             self.message = ("".to_string(), false);
@@ -400,7 +401,10 @@ where
 
     async fn write_attempts_feedback(&mut self) -> Result<(), std::io::Error> {
         if let Some((left_attempts, feedback)) = &self.attempts {
-            write!(self.writer, "{}", (feedback)(*left_attempts)).await?;
+            // write!(self.writer, "{}", (feedback)(*left_attempts)).await?;//////////////////////////////////////////////////
+            self.writer
+                .write((feedback)(*left_attempts).as_bytes())
+                .await?;
             self.writer.flush().await?;
         };
         Ok(())
@@ -408,7 +412,14 @@ where
 
     async fn take_input(&mut self) -> Result<String, std::io::Error> {
         let mut input = String::new();
-        self.reader.read_line(&mut input).await?;
+        if self.reader.read_line(&mut input).await? == 0 {
+            // We reached EOF
+            async_std::task::yield_now().await; // Giving back control
+            self.writer
+                .write(("EOF".to_string() + "\n").as_bytes())
+                .await?;
+            self.writer.flush().await?;
+        }
         Ok(input)
     }
 
@@ -424,7 +435,8 @@ where
             let result = (str_test.0)(str_proposal);
             if let Err(ref e) = result {
                 if str_test.1 {
-                    writeln!(self.writer, "{}", e).await?;
+                    // writeln!(self.writer, "{}", e).await?; //////////////////////////////////////////////////
+                    self.writer.write((e.to_string() + "\n").as_bytes()).await?;
                     self.writer.flush().await?;
                 }
                 self.display_help().await?;
@@ -437,14 +449,16 @@ where
     async fn parse_input(&mut self, input: &str) -> eyre::Result<T> {
         if input == "" && self.required.1 {
             self.display_help().await?;
-            write!(self.writer, "{}", self.required.0).await?;
+            // write!(self.writer, "{}", self.required.0).await?; //////////////////////////////////////////////////
+            self.writer.write(self.required.0.as_bytes()).await?;
             self.writer.flush().await?;
         }
         let result = (self.parser.0)(input);
         if let Err(ref e) = result {
             self.display_help().await?;
             if self.parser.1 {
-                writeln!(self.writer, "{}", e).await?;
+                // writeln!(self.writer, "{}", e).await?; //////////////////////////////////////////////////
+                self.writer.write((e.to_string() + "\n").as_bytes()).await?;
                 self.writer.flush().await?;
             }
         }
@@ -456,7 +470,8 @@ where
             let result = (test.0)(proposal);
             if let Err(e) = result {
                 if test.1 {
-                    writeln!(self.writer, "{}", e).await?;
+                    // writeln!(self.writer, "{}", e).await?; //////////////////////////////////////////////////
+                    self.writer.write((e.to_string() + "\n").as_bytes()).await?;
                     self.writer.flush().await?;
                 }
                 self.display_help().await?;
@@ -467,7 +482,8 @@ where
     }
 
     async fn display_help(&mut self) -> Result<(), std::io::Error> {
-        write!(self.writer, "{}", self.help.0).await?;
+        // write!(self.writer, "{}", self.help.0).await?; //////////////////////////////////////////////////
+        self.writer.write(self.help.0.as_bytes()).await?;
         self.writer.flush().await?;
 
         if !self.help.1 {
@@ -477,7 +493,8 @@ where
     }
 
     async fn give_feedback(&mut self, value: &T) -> Result<(), std::io::Error> {
-        write!(self.writer, "{}", (self.feedback)(value)).await?;
+        // write!(self.writer, "{}", (self.feedback)(value)).await?;//////////////////////////////////////////////////
+        self.writer.write((self.feedback)(value).as_bytes()).await?;
         self.writer.flush().await?;
         Ok(())
     }
@@ -694,10 +711,12 @@ mod tests {
     use async_std::io;
 
     #[test]
-    fn checking_is_send() {
-        let question = QuestionBuilder::new_fromstr(io::stdin(), io::stdout()).ask();
-        fn is_send<T: Send>(_: T) {}
-        is_send(question);
-        let answer: bool = async_std::task::block_on(question).unwrap();
+    fn is_send() {
+        if false {
+            let question = QuestionBuilder::new_fromstr(io::stdin(), io::stdout()).ask();
+            fn is_send<T: Send>(_: &T) {}
+            is_send(&question);
+            let _answer: bool = async_std::task::block_on(question).unwrap();
+        }
     }
 }

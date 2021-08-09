@@ -11,7 +11,8 @@ use std::time::Duration;
 fn main() {
     let ans = async {
         asking::yn()
-            .message("Shall I continue? (you have 5 seconds to answer)")
+            .message("Shall I continue? (you have 5 seconds to answer) ")
+            .help("Please use format y/n. Try again: ")
             .default_value(true)
             .timeout(Duration::from_secs(5_u64))
             .ask()
