@@ -17,7 +17,7 @@ where
 /// - `false`: "false" or "f" or "no" or "n"
 pub fn yn() -> StdQuestionBuilder<bool> {
     StdQuestionBuilder::from(|s: &str| match s.to_lowercase().as_str() {
-        "true" | "yes" | "y" | "t" => Ok(true),
+        "true" | "t" | "yes" | "y" => Ok(true),
         "false" | "f" | "no" | "n" => Ok(false),
         _ => s.parse(),
     })

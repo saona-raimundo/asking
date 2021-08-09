@@ -6,20 +6,18 @@ How to save functions?
 - https://stackoverflow.com/questions/64298245/in-rust-what-is-fn
 - https://doc.rust-lang.org/book/ch15-00-smart-pointers.html
 
-## Examples
-
-- Complete as in [read_input](https://crates.io/crates/read_input)!
-
 ## Documentation
 
 - Add gifs as in [inqiure](https://crates.io/crates/inquire)
 
-- 
+- Remark: Errors in the process are displayed with new_line, just as a standard error in Rust
 
 ## Test
 
-- date
-- `select`
+- Test behaviour of all examples
+- Give examples for file reader/writer
+- Document examples
+- Use async capabilities!
 
 ## API Guidelines
 

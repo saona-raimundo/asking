@@ -36,7 +36,7 @@ pub struct QuestionBuilder<T, R, W> {
     parser: (Arc<dyn Fn(&str) -> eyre::Result<T>>, bool),
     tests: Vec<(Arc<dyn Fn(&T) -> eyre::Result<()>>, bool)>,
     executor: Executor,
-    attempts: Option<usize>,
+    attempts: Option<(usize, Arc<dyn Fn(usize) -> String>)>,
     required: (String, bool),
 }
 
@@ -150,7 +150,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     }
 
     pub fn test(self, test: impl Fn(&T) -> bool + 'static) -> Self {
-        self.test_with_msg(test, "The value failed a test.\n")
+        self.test_with_msg(test, "The value failed a test.")
     }
 
     pub fn test_with_msg(
@@ -184,7 +184,7 @@ where
     where
         I: IntoIterator<Item = T> + 'static,
     {
-        self.inside_with_msg(iterator, "Value is not one of the options.\n")
+        self.inside_with_msg(iterator, "Value is not one of the options.")
     }
 
     /// Test if the value is inside an iterator
@@ -205,7 +205,7 @@ where
 
     /// Test if the value is at most `upper_bound`.
     pub fn max(self, upper_bound: T) -> Self {
-        self.max_with_msg(upper_bound, "The value can not be so big.\n")
+        self.max_with_msg(upper_bound, "The value can not be so big.")
     }
 
     /// Test if the value is at most `upper_bound`.
@@ -215,8 +215,8 @@ where
 
     /// Test if the value is between `lower_bound` and `upper_bound`, including borders.
     pub fn min_max(self, lower_bound: T, upper_bound: T) -> Self {
-        self.min_with_msg(lower_bound, "The value can not be so small.\n")
-            .max_with_msg(upper_bound, "The value can not be so big.\n")
+        self.min_with_msg(lower_bound, "The value can not be so small.")
+            .max_with_msg(upper_bound, "The value can not be so big.")
     }
 
     /// Test if the value is between `lower_bound` and `upper_bound`, including borders.
@@ -234,7 +234,7 @@ where
 
     /// Test if the value is at least `lower_bound`.
     pub fn min(self, lower_bound: T) -> Self {
-        self.min_with_msg(lower_bound, "The value can not be so small.\n")
+        self.min_with_msg(lower_bound, "The value can not be so small.")
     }
 
     /// Test if the value is at least `lower_bound`.
@@ -244,7 +244,7 @@ where
 
     /// Test if the value is not `other`.
     pub fn not(self, other: T) -> Self {
-        self.not_with_msg(other, "This value is not allowed.\n")
+        self.not_with_msg(other, "This value is not allowed.")
     }
 
     /// Test if the value is not `other`.
@@ -256,8 +256,27 @@ where
 /// # Useful settings
 impl<T, R, W> QuestionBuilder<T, R, W> {
     /// Bound the number of possible attempts.
+    ///
+    /// The default value is `None`, which gives infinite attempts to the user.
     pub fn attempts<O: Into<Option<usize>>>(mut self, attempts: O) -> Self {
-        self.attempts = attempts.into();
+        match attempts.into() {
+            Some(attempts) => self.attempts_with_feedback(attempts, |_| "".to_string()),
+            None => {
+                self.attempts = None;
+                self
+            }
+        }
+    }
+
+    /// Bound the number of possible attempts.
+    ///
+    /// The default value is `None`, which gives infinite attempts to the user.
+    pub fn attempts_with_feedback(
+        mut self,
+        attempts: usize,
+        feedback: impl Fn(usize) -> String + 'static,
+    ) -> Self {
+        self.attempts = Some((attempts, Arc::new(feedback)));
         self
     }
 
@@ -301,11 +320,6 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self.executor = Executor::Timeout(duration);
         self
     }
-
-    pub fn block_on(mut self) -> Self {
-        self.executor = Executor::BlockOn;
-        self
-    }
 }
 
 /// # Prompt functionalities
@@ -321,7 +335,6 @@ where
     /// When there are problems with displaying messages or reading input.
     pub async fn ask(self) -> Result<T, crate::error::Processing> {
         match self.executor {
-            Executor::BlockOn => async_std::task::block_on(self.ask_loop()),
             Executor::None => self.ask_loop().await,
             Executor::Timeout(duration) => {
                 async_std::future::timeout(duration, self.ask_loop()).await?
@@ -331,7 +344,9 @@ where
 
     async fn ask_loop(mut self) -> Result<T, crate::error::Processing> {
         loop {
+            self.check_attempts()?;
             self.write_message().await?;
+            self.write_attempts_feedback().await?;
             let preinput = self.take_input().await?;
             self.decrease_attempts()?;
             let input = (self.preparser)(preinput);
@@ -354,12 +369,27 @@ where
         }
     }
 
+    fn check_attempts(&mut self) -> Result<(), crate::error::Processing> {
+        match self.attempts {
+            Some((0, _)) => Err(crate::error::Processing::NoMoreAttempts),
+            _ => Ok(()),
+        }
+    }
+
     async fn write_message(&mut self) -> Result<(), std::io::Error> {
         write!(self.writer, "{}", &self.message.0).await?;
         self.writer.flush().await?;
         if !self.message.1 {
             self.message = ("".to_string(), false);
         }
+        Ok(())
+    }
+
+    async fn write_attempts_feedback(&mut self) -> Result<(), std::io::Error> {
+        if let Some((left_attempts, feedback)) = &self.attempts {
+            write!(self.writer, "{}", (feedback)(*left_attempts)).await?;
+            self.writer.flush().await?;
+        };
         Ok(())
     }
 
@@ -370,13 +400,9 @@ where
     }
 
     fn decrease_attempts(&mut self) -> Result<(), crate::error::Processing> {
-        if let Some(left_attempts) = self.attempts {
-            if left_attempts == 0 {
-                return Err(crate::error::Processing::NoMoreAttempts);
-            } else {
-                self.attempts = Some(left_attempts - 1);
-            }
-        };
+        if let Some((left_attempts, _)) = &mut self.attempts {
+            *left_attempts -= 1;
+        }
         Ok(())
     }
 
@@ -385,7 +411,7 @@ where
             let result = (str_test.0)(str_proposal);
             if let Err(ref e) = result {
                 if str_test.1 {
-                    write!(self.writer, "{}\n", e).await?;
+                    writeln!(self.writer, "{}", e).await?;
                     self.writer.flush().await?;
                 }
                 self.display_help().await?;
@@ -405,7 +431,7 @@ where
         if let Err(ref e) = result {
             self.display_help().await?;
             if self.parser.1 {
-                write!(self.writer, "{}\n", e).await?;
+                writeln!(self.writer, "{}", e).await?;
                 self.writer.flush().await?;
             }
         }
@@ -417,7 +443,7 @@ where
             let result = (test.0)(proposal);
             if let Err(e) = result {
                 if test.1 {
-                    write!(self.writer, "{}", e).await?;
+                    writeln!(self.writer, "{}", e).await?;
                     self.writer.flush().await?;
                 }
                 self.display_help().await?;
@@ -620,7 +646,6 @@ where
             .field("help", &self.help)
             .field("default", &self.default)
             .field("executor", &self.executor)
-            .field("attempts", &self.attempts)
             .field("required", &self.required)
             .finish_non_exhaustive()
     }
