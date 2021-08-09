@@ -10,61 +10,52 @@ Build async prompts.
 
 Ever wanted non-blocking user input? Here you are!
 
+[Asynchronous I/O](https://en.wikipedia.org/wiki/Asynchronous_I/O) is a form of input/output processing that allows you to do something while waiting for an answer.
+
 ## Features
 
 - **Asynchronous** - You can work while the user inputs something and even timeout!
 - **Common patterns** - Built-in common question patterns including 
-  - `yn` - yes/no questions.
-  - `date` - uses `chrono::naive::NaiveDate`.
-  - `select` - choose one option.
-  - `text` - just a String
-  - `T: std::str::FromStr` - your own type!
-- **Cross-platform** - It is actually generic on writer and reader!
-- **Help messages** - Help the user input a correct answer.
-- **Feedback** - Give feedback to the user after the input has been correctly processed!
+  - **yn** - yes/no questions (see `yn` function).
+  - **date** - dates in `%Y-%m-%d` format (see `date` function).
+  - **select** - choose one option (see `inside` method).
+  - **text** - just a String (see `text` function).
+  - **T** - your own type! (implementing or not the trait `FromStr`).
+- **Cross-platform** - Generic on writer and reader!
+- **Help messages** - Help the user to input a correct answer.
+- **Test with feedback** - Test the input and, optionally, give feedback upon errors.
 - **Default values** - Add a value for empty inputs.
 - **Standardized error handling** - You can manage errors!
-- **Feedback** - Display a message in response to the input.
-- **Validation** - Include tests that the input has to pass.
+- **Feedback** - Display a final message depending on the accepted value.
 
 
 ## Limitations
 
-- **Internal mutability of functions** - All functions passed are `Arc<dyn Fn>`. This  allows both functions and closures, but it means that functions can not hold any mutable references inside.
+- **Internal mutability of functions** - All functions are stored as `Arc<dyn Fn>`. This  allows both functions and closures, but it means that functions can not hold any mutable references (so no internal mutability).
 - **Consuming methods** - Methods are consuming allowing one-line constructions, while making more difficult complex construction patterns. This is because of the existence of default values. Check out [C-BUILDER](https://rust-lang.github.io/api-guidelines/type-safety.html#c-builder).
 
-Let me know about more, I will be happy to add them!
+Let me know if you find anything else, I will be happy to add it!
 
 ## Quick example
 
-Give only five seconds to the user to confirm something, and continue upon no input!
+Give only five seconds to the user to confirm something, and continue upon no input! (instead of keep waiting)
 
 ```rust
 use asking::error::Processing;
 use std::time::Duration;
 
-fn main() {
-    let ans = async {
-        asking::yn()
-            .message("Shall I continue? (you have 5 seconds to answer)")
-            .default_value(true) // value upon simple ENTER
-            .timeout(Duration::from_secs(5_u64))
-            .ask()
-            .await
-    };
+let question = asking::yn()
+    .message("Shall I continue? (you have 5 seconds to answer)")
+    .default_value(true) // value upon empty input
+    .timeout(Duration::from_secs(5_u64))
+    .ask();
 
-    match async_std::task::block_on(ans) { // we decide to just wait, at most five secs
-        Ok(true) => println!("Super!"),
-        Ok(false) => println!("Okay, shutting down..."),
-        Err(p) => match p {
-            Processing::Timeout { .. } => {
-                println!("I think you are not here, I will continue :)") // Automatic decision!
-            }
-            _ => eprintln!("Error with questionnaire, try again later"),
-        },
-    }
+match async_std::task::block_on(question) { // we decide to just wait, at most five secs
+    Ok(true) => println!("Super!"),
+    Ok(false) => println!("Okay, shutting down..."),
+    Err(Processing::Timeout { .. }) => println!("I think you are not here, I will continue :)"), // Automatic decision!,
+    _ => eprintln!("Error with questionnaire, try again later"),
 }
-
 ```
 
 
@@ -73,13 +64,13 @@ Check out [more examples](https://github.com/saona-raimundo/asking/tree/main/exa
 
 ## Usage
 
-(TODO)
+With [cargo-edit](https://crates.io/crates/cargo-edit) installed, simply type
 
-## Optional features
+```ignore
+cargo add asking
+```
 
-(TODO)
-
-- **date** - 
+and you are good to go!
 
 ## Related crates
 
@@ -108,6 +99,8 @@ Some crates are good to use together!
 - [async-dup](https://crates.io/crates/async-dup) - Duplicate an I/O handle
 
 ## FAQ
+
+(TODO)
 
 ### Testing
 

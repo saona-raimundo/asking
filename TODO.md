@@ -15,9 +15,10 @@ How to save functions?
 ## Test
 
 - Test behaviour of all examples
-- Give examples for file reader/writer
 - Document examples
 - Use async capabilities!
+  - guessing game with tips (remainder of the current bounds without sleep!)
+  - 
 
 ## API Guidelines
 

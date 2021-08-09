@@ -1,5 +1,7 @@
 //! Build async prompts for non-blocking user input!
+//!
 
+// Testing code in README.md
 #[cfg(doctest)]
 doc_comment::doctest!("../README.md");
 
