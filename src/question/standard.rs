@@ -13,7 +13,7 @@ pub type StdQuestionBuilder<T> = QuestionBuilder<T, Stdin, Stdout>;
 /// # Constructors
 impl<T, F, E> From<F> for StdQuestionBuilder<T>
 where
-    F: Fn(&str) -> Result<T, E> + 'static,
+    F: Fn(&str) -> Result<T, E> + Send + Sync + 'static,
     E: Error + Send + Sync + 'static,
 {
     fn from(parser: F) -> Self {
@@ -23,7 +23,7 @@ where
 
 impl<T> Default for StdQuestionBuilder<T>
 where
-    T: FromStr,
+    T: FromStr + Send + Sync,
     <T as FromStr>::Err: Send + Sync + Error + 'static,
 {
     fn default() -> Self {

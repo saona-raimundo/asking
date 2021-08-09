@@ -30,21 +30,21 @@ pub struct QuestionBuilder<T, R, W> {
     message: (String, bool),
     help: (String, bool),
     default: Option<T>,
-    feedback: Arc<dyn Fn(&T) -> String>,
-    preparser: Arc<dyn Fn(String) -> String>,
-    str_tests: Vec<(Arc<dyn Fn(&str) -> eyre::Result<()>>, bool)>,
-    parser: (Arc<dyn Fn(&str) -> eyre::Result<T>>, bool),
-    tests: Vec<(Arc<dyn Fn(&T) -> eyre::Result<()>>, bool)>,
+    feedback: Arc<dyn Fn(&T) -> String + Send + Sync>,
+    preparser: Arc<dyn Fn(String) -> String + Send + Sync>,
+    str_tests: Vec<(Arc<dyn Fn(&str) -> eyre::Result<()> + Send + Sync>, bool)>,
+    parser: (Arc<dyn Fn(&str) -> eyre::Result<T> + Send + Sync>, bool),
+    tests: Vec<(Arc<dyn Fn(&T) -> eyre::Result<()> + Send + Sync>, bool)>,
     executor: Executor,
-    attempts: Option<(usize, Arc<dyn Fn(usize) -> String>)>,
+    attempts: Option<(usize, Arc<dyn Fn(usize) -> String + Send + Sync>)>,
     required: (String, bool),
 }
 
 /// # Constructor
 impl<T, R, W> QuestionBuilder<T, R, W>
 where
-    R: Read,
-    W: Write,
+    R: Read + Send + Sync,
+    W: Write + Send + Sync,
 {
     /// Constructs a new `QuestionBuilder<T, R, W>` with a default `preparser`.
     ///
@@ -53,7 +53,7 @@ where
     /// The `preparser` trims the end of the input. To override this, use the `preparser` method.
     pub fn new<F, E>(reader: R, writer: W, parser: F) -> Self
     where
-        F: Fn(&str) -> Result<T, E> + 'static,
+        F: Fn(&str) -> Result<T, E> + Send + Sync + 'static,
         E: Error + Send + Sync + 'static,
     {
         Self {
@@ -79,10 +79,10 @@ where
 
 impl<T, R, W> QuestionBuilder<T, R, W>
 where
-    T: FromStr,
+    T: FromStr + Send + Sync,
     <T as FromStr>::Err: Send + Sync + Error + 'static,
-    R: Read,
-    W: Write,
+    R: Read + Send + Sync,
+    W: Write + Send + Sync,
 {
     /// Constructs a new `QuestionBuilder<T, R, W>` with a default `preparser`.
     /// The parser is given by the implementation of `FromStr`.
@@ -132,7 +132,10 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self
     }
 
-    pub fn feedback(mut self, feedback: impl Fn(&T) -> String + 'static) -> Self {
+    pub fn feedback<F>(mut self, feedback: F) -> Self
+    where
+        F: Fn(&T) -> String + Send + Sync + 'static,
+    {
         self.feedback = Arc::new(feedback);
         self
     }
@@ -149,15 +152,18 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self
     }
 
-    pub fn test(self, test: impl Fn(&T) -> bool + 'static) -> Self {
+    pub fn test<F>(self, test: F) -> Self
+    where
+        F: Fn(&T) -> bool + Send + Sync + 'static,
+    {
         self.test_with_msg(test, "The value failed a test.")
     }
 
-    pub fn test_with_msg(
-        self,
-        test: impl Fn(&T) -> bool + 'static,
-        message: impl ToString + 'static,
-    ) -> Self {
+    pub fn test_with_msg<F, M>(self, test: F, message: M) -> Self
+    where
+        F: Fn(&T) -> bool + Send + Sync + 'static,
+        M: ToString + Send + Sync + 'static,
+    {
         let test = move |value: &T| match test(value) {
             true => Ok(()),
             false => Err(Report::msg(message.to_string())),
@@ -173,7 +179,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 /// Not all bounds are used in all methods. Open an issue in GitHub if this is a problem for you.
 impl<T, R, W> QuestionBuilder<T, R, W>
 where
-    T: PartialEq + PartialOrd + 'static,
+    T: PartialEq + PartialOrd + Send + Sync + 'static,
 {
     /// Test if the value is inside an iterator
     ///
@@ -192,9 +198,10 @@ where
     /// # Remarks
     ///
     /// To prevent infinite loops, make sure `iterator` is finite.
-    pub fn inside_with_msg<I>(self, iterator: I, message: impl ToString + 'static) -> Self
+    pub fn inside_with_msg<I, M>(self, iterator: I, message: M) -> Self
     where
         I: IntoIterator<Item = T> + 'static,
+        M: ToString + Send + Sync + 'static,
     {
         let options: Vec<T> = iterator.into_iter().collect();
         self.test_with_msg(
@@ -209,7 +216,10 @@ where
     }
 
     /// Test if the value is at most `upper_bound`.
-    pub fn max_with_msg(self, upper_bound: T, message: impl ToString + 'static) -> Self {
+    pub fn max_with_msg<M>(self, upper_bound: T, message: M) -> Self
+    where
+        M: ToString + Send + Sync + 'static,
+    {
         self.test_with_msg(move |value: &T| *value <= upper_bound, message)
     }
 
@@ -220,12 +230,10 @@ where
     }
 
     /// Test if the value is between `lower_bound` and `upper_bound`, including borders.
-    pub fn min_max_with_msg(
-        self,
-        lower_bound: T,
-        upper_bound: T,
-        message: impl ToString + 'static,
-    ) -> Self {
+    pub fn min_max_with_msg<M>(self, lower_bound: T, upper_bound: T, message: M) -> Self
+    where
+        M: ToString + Send + Sync + 'static,
+    {
         self.test_with_msg(
             move |value: &T| (lower_bound <= *value) && (*value <= upper_bound),
             message,
@@ -238,7 +246,10 @@ where
     }
 
     /// Test if the value is at least `lower_bound`.
-    pub fn min_with_msg(self, lower_bound: T, message: impl ToString + 'static) -> Self {
+    pub fn min_with_msg<M>(self, lower_bound: T, message: M) -> Self
+    where
+        M: ToString + Send + Sync + 'static,
+    {
         self.test_with_msg(move |value: &T| *value >= lower_bound, message)
     }
 
@@ -248,7 +259,10 @@ where
     }
 
     /// Test if the value is not `other`.
-    pub fn not_with_msg(self, other: T, message: impl ToString + 'static) -> Self {
+    pub fn not_with_msg<M>(self, other: T, message: M) -> Self
+    where
+        M: ToString + Send + Sync + 'static,
+    {
         self.test_with_msg(move |value: &T| *value != other, message)
     }
 }
@@ -271,11 +285,10 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     /// Bound the number of possible attempts.
     ///
     /// The default value is `None`, which gives infinite attempts to the user.
-    pub fn attempts_with_feedback(
-        mut self,
-        attempts: usize,
-        feedback: impl Fn(usize) -> String + 'static,
-    ) -> Self {
+    pub fn attempts_with_feedback<F>(mut self, attempts: usize, feedback: F) -> Self
+    where
+        F: Fn(usize) -> String + Send + Sync + 'static,
+    {
         self.attempts = Some((attempts, Arc::new(feedback)));
         self
     }
@@ -482,7 +495,10 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     ///
     /// This is applied to the raw input before being parsed to `T`.
     /// In CLI applications, it is useful to clean the leading new line that comes with the input.
-    pub fn preparser(mut self, preparser: impl Fn(String) -> String + 'static) -> Self {
+    pub fn preparser<F>(mut self, preparser: F) -> Self
+    where
+        F: Fn(String) -> String + Send + Sync + 'static,
+    {
         self.preparser = Arc::new(preparser);
         self
     }
@@ -492,15 +508,18 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     /// # Remarks
     ///
     /// There is a default message that you might want to overwrite with `str_test_with_msg`.
-    pub fn str_test(self, str_test: impl Fn(&str) -> bool + 'static) -> Self {
+    pub fn str_test(
+        self,
+        str_test: impl Fn(&str) -> bool + 'static + std::marker::Send + std::marker::Sync,
+    ) -> Self {
         self.str_test_with_msg(str_test, "The input failed a test before being parsed.\n")
     }
 
     /// Add a test over the unparsed input and shows the message if an error occurs.
     pub fn str_test_with_msg(
         self,
-        str_test: impl Fn(&str) -> bool + 'static,
-        message: impl ToString + 'static,
+        str_test: impl Fn(&str) -> bool + 'static + std::marker::Send + std::marker::Sync,
+        message: impl ToString + 'static + std::marker::Send + std::marker::Sync,
     ) -> Self {
         let str_test = move |s: &str| match str_test(s) {
             true => Ok(()),
@@ -520,7 +539,11 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 
     /// Tests that the input length is equal to `exact_length`.
     ///
-    pub fn length_with_msg(self, exact_length: usize, message: impl ToString + 'static) -> Self {
+    pub fn length_with_msg(
+        self,
+        exact_length: usize,
+        message: impl ToString + 'static + std::marker::Send + std::marker::Sync,
+    ) -> Self {
         self.str_test_with_msg(move |s: &str| s.len() == exact_length, message)
     }
 
@@ -535,7 +558,11 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 
     /// Tests that the input length is less or equal to `max_length`.
     ///
-    pub fn max_length_with_msg(self, max_length: usize, message: impl ToString + 'static) -> Self {
+    pub fn max_length_with_msg(
+        self,
+        max_length: usize,
+        message: impl ToString + 'static + std::marker::Send + std::marker::Sync,
+    ) -> Self {
         self.str_test_with_msg(move |s: &str| s.len() <= max_length, message)
     }
 
@@ -550,12 +577,19 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 
     /// Tests that the input length is greater or equal to `min_length`.
     ///
-    pub fn min_length_with_msg(self, min_length: usize, message: impl ToString + 'static) -> Self {
+    pub fn min_length_with_msg(
+        self,
+        min_length: usize,
+        message: impl ToString + 'static + std::marker::Send + std::marker::Sync,
+    ) -> Self {
         self.str_test_with_msg(move |s: &str| s.len() >= min_length, message)
     }
 
     /// Set the parser for the input. Errors will NOT be displayed if they occur.
-    pub fn parser(mut self, parser: impl Fn(&str) -> eyre::Result<T> + 'static) -> Self {
+    pub fn parser<F>(mut self, parser: F) -> Self
+    where
+        F: Fn(&str) -> eyre::Result<T> + Send + Sync + 'static,
+    {
         self.parser = (Arc::new(parser), false);
         self
     }
@@ -608,25 +642,28 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     }
 
     /// Set the parser for the input. Errors will be displayed if they occur.
-    pub fn parser_with_feedback(
-        mut self,
-        parser: impl Fn(&str) -> eyre::Result<T> + 'static,
-    ) -> Self {
+    pub fn parser_with_feedback<F>(mut self, parser: F) -> Self
+    where
+        F: Fn(&str) -> eyre::Result<T> + Send + Sync + 'static,
+    {
         self.parser = (Arc::new(parser), true);
         self
     }
 
     /// Add a test over the unparsed input and displays the error, if one occurs.
-    pub fn str_test_with_feedback(
-        mut self,
-        str_test: impl Fn(&str) -> eyre::Result<()> + 'static,
-    ) -> Self {
+    pub fn str_test_with_feedback<F>(mut self, str_test: F) -> Self
+    where
+        F: Fn(&str) -> eyre::Result<()> + Send + Sync + 'static,
+    {
         self.str_tests.push((Arc::new(str_test), true));
         self
     }
 
     /// Add a test over the parsed input whose error is displayed, if one occurs.
-    pub fn test_with_feedback(mut self, test: impl Fn(&T) -> eyre::Result<()> + 'static) -> Self {
+    pub fn test_with_feedback<F>(mut self, test: F) -> Self
+    where
+        F: Fn(&T) -> eyre::Result<()> + Send + Sync + 'static,
+    {
         self.tests.push((Arc::new(test), true));
         self
     }
@@ -648,5 +685,19 @@ where
             .field("executor", &self.executor)
             .field("required", &self.required)
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_std::io;
+
+    #[test]
+    fn checking_is_send() {
+        let question = QuestionBuilder::new_fromstr(io::stdin(), io::stdout()).ask();
+        fn is_send<T: Send>(_: T) {}
+        is_send(question);
+        let answer: bool = async_std::task::block_on(question).unwrap();
     }
 }

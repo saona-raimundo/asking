@@ -4,7 +4,7 @@ use chrono::naive::NaiveDate;
 ///
 pub fn question<T: std::str::FromStr>() -> StdQuestionBuilder<T>
 where
-    T: std::str::FromStr,
+    T: std::str::FromStr + Send + Sync,
     <T as std::str::FromStr>::Err: Send + Sync + std::error::Error + 'static,
 {
     StdQuestionBuilder::default()

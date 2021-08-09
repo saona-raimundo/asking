@@ -1,3 +1,10 @@
+//! Yes/no question.
+//!
+//! This examples shows the use of
+//! - `yn`
+//! - `timeout`
+//! - Error handling
+
 use asking::error::Processing;
 use std::time::Duration;
 
@@ -14,11 +21,9 @@ fn main() {
     match async_std::task::block_on(ans) {
         Ok(true) => println!("Super!"),
         Ok(false) => println!("Okay, shutting down..."),
-        Err(p) => match p {
-            Processing::Timeout { .. } => {
-                println!("I think you are not here, I will continue :)")
-            }
-            _ => eprintln!("Error with questionnaire, try again later"),
-        },
+        Err(Processing::Timeout { .. }) => {
+            println!("I think you are not here, I will continue :)")
+        }
+        Err(_) => eprintln!("Error with questionnaire, try again later"),
     }
 }
