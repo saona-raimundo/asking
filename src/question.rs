@@ -9,7 +9,9 @@ use core::{fmt::Debug, str::FromStr};
 use eyre::Report;
 use std::{error::Error, marker::Unpin, string::ToString, time::Duration};
 
+mod executor;
 mod standard;
+pub use executor::Executor;
 pub use standard::StdQuestionBuilder;
 
 /// ## Contents
@@ -33,7 +35,7 @@ pub struct QuestionBuilder<T, R, W> {
     str_tests: Vec<(Arc<dyn Fn(&str) -> eyre::Result<()>>, bool)>,
     parser: (Arc<dyn Fn(&str) -> eyre::Result<T>>, bool),
     tests: Vec<(Arc<dyn Fn(&T) -> eyre::Result<()>>, bool)>,
-    timeout: Option<Duration>,
+    executor: Executor,
     attempts: Option<usize>,
     required: (String, bool),
 }
@@ -68,7 +70,7 @@ where
                 bool::default(),
             ),
             tests: Vec::default(),
-            timeout: None,
+            executor: Executor::None,
             attempts: None,
             required: (String::default(), bool::default()),
         }
@@ -103,7 +105,7 @@ where
                 bool::default(),
             ),
             tests: Vec::default(),
-            timeout: None,
+            executor: Executor::None,
             attempts: None,
             required: (String::default(), bool::default()),
         }
@@ -289,9 +291,19 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         self.required.1 = !self.required.1;
         self
     }
+}
 
-    pub fn timeout<O: Into<Option<Duration>>>(mut self, duration: O) -> Self {
-        self.timeout = duration.into();
+/// # Executors
+///
+/// For ease of use, there are some built-in executors.
+impl<T, R, W> QuestionBuilder<T, R, W> {
+    pub fn timeout(mut self, duration: Duration) -> Self {
+        self.executor = Executor::Timeout(duration);
+        self
+    }
+
+    pub fn block_on(mut self) -> Self {
+        self.executor = Executor::BlockOn;
         self
     }
 }
@@ -308,10 +320,12 @@ where
     ///
     /// When there are problems with displaying messages or reading input.
     pub async fn ask(self) -> Result<T, crate::error::Processing> {
-        if let Some(duration) = self.timeout {
-            async_std::future::timeout(duration, self.ask_loop()).await?
-        } else {
-            self.ask_loop().await
+        match self.executor {
+            Executor::BlockOn => async_std::task::block_on(self.ask_loop()),
+            Executor::None => self.ask_loop().await,
+            Executor::Timeout(duration) => {
+                async_std::future::timeout(duration, self.ask_loop()).await?
+            }
         }
     }
 
@@ -384,7 +398,7 @@ where
     async fn parse_input(&mut self, input: &str) -> eyre::Result<T> {
         if input == "" && self.required.1 {
             self.display_help().await?;
-            write!(self.writer, "{}\n", self.required.0).await?;
+            write!(self.writer, "{}", self.required.0).await?;
             self.writer.flush().await?;
         }
         let result = (self.parser.0)(input);
@@ -403,7 +417,7 @@ where
             let result = (test.0)(proposal);
             if let Err(e) = result {
                 if test.1 {
-                    write!(self.writer, "{}\n", e).await?;
+                    write!(self.writer, "{}", e).await?;
                     self.writer.flush().await?;
                 }
                 self.display_help().await?;
@@ -535,7 +549,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
             str_tests: self.str_tests,
             parser: self.parser,
             tests: self.tests,
-            timeout: self.timeout,
+            executor: self.executor,
             attempts: self.attempts,
             required: self.required,
         }
@@ -553,7 +567,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
             str_tests: self.str_tests,
             parser: self.parser,
             tests: self.tests,
-            timeout: self.timeout,
+            executor: self.executor,
             attempts: self.attempts,
             required: self.required,
         }
@@ -605,7 +619,7 @@ where
             .field("message", &self.message)
             .field("help", &self.help)
             .field("default", &self.default)
-            .field("timeout", &self.timeout)
+            .field("executor", &self.executor)
             .field("attempts", &self.attempts)
             .field("required", &self.required)
             .finish_non_exhaustive()

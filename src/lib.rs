@@ -7,5 +7,5 @@ pub mod error;
 mod pattern;
 mod question;
 
-pub use pattern::{date, password, question, select, text, yn};
+pub use pattern::{date, question, text, yn};
 pub use question::{QuestionBuilder, StdQuestionBuilder};

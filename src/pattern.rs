@@ -1,7 +1,5 @@
 use crate::StdQuestionBuilder;
 use chrono::naive::NaiveDate;
-use core::str::FromStr;
-use std::error::Error;
 
 ///
 pub fn question<T: std::str::FromStr>() -> StdQuestionBuilder<T>
@@ -12,39 +10,22 @@ where
     StdQuestionBuilder::default()
 }
 
-///
+/// Yes/No questions.
 ///
 /// The default parser reads, after making lowercase, the following:
 /// - `true`: "true" or "t" or "yes" or "y"
 /// - `false`: "false" or "f" or "no" or "n"
 pub fn yn() -> StdQuestionBuilder<bool> {
-    StdQuestionBuilder::default().parser(|s: &str| match s.to_lowercase().as_str() {
+    StdQuestionBuilder::from(|s: &str| match s.to_lowercase().as_str() {
         "true" | "yes" | "y" | "t" => Ok(true),
         "false" | "f" | "no" | "n" => Ok(false),
-        _ => match s.parse() {
-            Ok(v) => Ok(v),
-            Err(e) => Err(eyre::Report::new(e)),
-        },
+        _ => s.parse(),
     })
 }
 
 ///
 pub fn date() -> StdQuestionBuilder<NaiveDate> {
     StdQuestionBuilder::default()
-}
-
-///
-pub fn select<T>(options: Vec<T>) -> StdQuestionBuilder<T>
-where
-    T: FromStr + PartialOrd + 'static,
-    <T as FromStr>::Err: Send + Sync + Error + 'static,
-{
-    StdQuestionBuilder::default().inside(options)
-}
-
-///
-pub fn password() -> StdQuestionBuilder<String> {
-    StdQuestionBuilder::default().feedback(|_| "".to_string())
 }
 
 ///

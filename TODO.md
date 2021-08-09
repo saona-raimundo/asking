@@ -6,23 +6,20 @@ How to save functions?
 - https://stackoverflow.com/questions/64298245/in-rust-what-is-fn
 - https://doc.rust-lang.org/book/ch15-00-smart-pointers.html
 
-## Traits
+## Examples
 
-- 
+- Complete as in [read_input](https://crates.io/crates/read_input)!
 
 ## Documentation
 
 - Add gifs as in [inqiure](https://crates.io/crates/inquire)
 
-## Examples
-
-- Complete as in [read_input](https://crates.io/crates/read_input)!
+- 
 
 ## Test
 
 - date
 - `select`
 
-## Errors 
+## API Guidelines
 
-Display them in a new line!
