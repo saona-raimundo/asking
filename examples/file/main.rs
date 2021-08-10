@@ -13,6 +13,7 @@ async fn main() -> eyre::Result<()> {
     // Create files with answers
     {
         let mut file = File::create("examples\\file\\in.txt")?;
+        file.set_len(0)?; // Clean the file
         write!(file, "{}", "false")?;
         File::create("examples\\file\\out.txt")?;
     }

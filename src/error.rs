@@ -1,3 +1,5 @@
+//!
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -9,6 +11,8 @@ pub enum Processing {
         #[from]
         source: std::io::Error,
     },
+    #[error("EOF reached while asking for input.")]
+    Eof,
     #[error("User could not answer the question in the given time.")]
     Timeout {
         #[from]

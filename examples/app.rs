@@ -1,4 +1,4 @@
-//! Short application to be tested through `child` example.
+//! Short application to be tested through the example `testing`.
 //!
 //! This examples shows the use of
 //! - `yn`

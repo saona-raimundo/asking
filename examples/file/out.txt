@@ -1,1 +1,2 @@
 Shall I continue?
+Please use y/n format.
