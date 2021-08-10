@@ -9,9 +9,9 @@ fn main() {
             .message("What level is your Pokemon?")
             .inside_with_msg(
                 5..=100,
-                "It should be at least level 5 and most 100, right? Try again.\n",
+                "It should be at least level 5 and most 100, right? Try again.",
             )
-            .required_with_msg("Sorry, I need this. Give me an answer please.\n")
+            .required_with_msg("Sorry, I need this. Give me an answer please.")
             .feedback(|level| format!("Level {}! That is awesome!\n", level))
             .ask(),
     )

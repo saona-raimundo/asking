@@ -35,6 +35,7 @@ pub struct QuestionBuilder<T, R, W> {
     str_tests: Vec<(Arc<dyn Fn(&str) -> eyre::Result<()> + Send + Sync>, bool)>,
     parser: (Arc<dyn Fn(&str) -> eyre::Result<T> + Send + Sync>, bool),
     tests: Vec<(Arc<dyn Fn(&T) -> eyre::Result<()> + Send + Sync>, bool)>,
+    error_formatter: Arc<dyn Fn(String) -> String + Send + Sync>,
     executor: Executor,
     attempts: Option<(usize, Arc<dyn Fn(usize) -> String + Send + Sync>)>,
     required: (String, bool),
@@ -70,6 +71,7 @@ where
                 bool::default(),
             ),
             tests: Vec::default(),
+            error_formatter: Arc::new(|s| s + "\n"),
             executor: Executor::None,
             attempts: None,
             required: (String::default(), bool::default()),
@@ -91,24 +93,7 @@ where
     ///
     /// The `preparser` trims the end of the input. To override this, use the `preparser` method.
     pub fn new_fromstr(reader: R, writer: W) -> Self {
-        Self {
-            reader: BufReader::new(reader),
-            writer: BufWriter::new(writer),
-            message: (String::default(), bool::default()),
-            help: (String::default(), bool::default()),
-            default: None,
-            feedback: Arc::new(|_| String::default()),
-            preparser: Arc::new(|s| s.trim_end().to_string()),
-            str_tests: Vec::default(),
-            parser: (
-                Arc::new(|s| s.parse().map_err(|e| Report::new(e))),
-                bool::default(),
-            ),
-            tests: Vec::default(),
-            executor: Executor::None,
-            attempts: None,
-            required: (String::default(), bool::default()),
-        }
+        Self::new(reader, writer, |s| s.parse())
     }
 }
 
@@ -396,7 +381,6 @@ where
     }
 
     async fn write_message(&mut self) -> Result<(), std::io::Error> {
-        // write!(self.writer, "{}", &self.message.0).await?;//////////////////////////////////////////////////
         self.writer.write(self.message.0.as_bytes()).await?;
         self.writer.flush().await?;
         if !self.message.1 {
@@ -407,7 +391,6 @@ where
 
     async fn write_attempts_feedback(&mut self) -> Result<(), std::io::Error> {
         if let Some((left_attempts, feedback)) = &self.attempts {
-            // write!(self.writer, "{}", (feedback)(*left_attempts)).await?;//////////////////////////////////////////////////
             self.writer
                 .write((feedback)(*left_attempts).as_bytes())
                 .await?;
@@ -436,8 +419,9 @@ where
             let result = (str_test.0)(str_proposal);
             if let Err(ref e) = result {
                 if str_test.1 {
-                    // writeln!(self.writer, "{}", e).await?; //////////////////////////////////////////////////
-                    self.writer.write((e.to_string() + "\n").as_bytes()).await?;
+                    self.writer
+                        .write((self.error_formatter)(e.to_string()).as_bytes())
+                        .await?;
                     self.writer.flush().await?;
                 }
                 self.display_help().await?;
@@ -450,16 +434,18 @@ where
     async fn parse_input(&mut self, input: &str) -> eyre::Result<T> {
         if input == "" && self.required.1 {
             self.display_help().await?;
-            // write!(self.writer, "{}", self.required.0).await?; //////////////////////////////////////////////////
-            self.writer.write(self.required.0.as_bytes()).await?;
+            self.writer
+                .write((self.error_formatter)(self.required.0.clone()).as_bytes())
+                .await?;
             self.writer.flush().await?;
         }
         let result = (self.parser.0)(input);
         if let Err(ref e) = result {
             self.display_help().await?;
             if self.parser.1 {
-                // writeln!(self.writer, "{}", e).await?; //////////////////////////////////////////////////
-                self.writer.write((e.to_string() + "\n").as_bytes()).await?;
+                self.writer
+                    .write((self.error_formatter)(e.to_string()).as_bytes())
+                    .await?;
                 self.writer.flush().await?;
             }
         }
@@ -471,8 +457,9 @@ where
             let result = (test.0)(proposal);
             if let Err(e) = result {
                 if test.1 {
-                    // writeln!(self.writer, "{}", e).await?; //////////////////////////////////////////////////
-                    self.writer.write((e.to_string() + "\n").as_bytes()).await?;
+                    self.writer
+                        .write((self.error_formatter)(e.to_string()).as_bytes())
+                        .await?;
                     self.writer.flush().await?;
                 }
                 self.display_help().await?;
@@ -483,7 +470,6 @@ where
     }
 
     async fn display_help(&mut self) -> Result<(), std::io::Error> {
-        // write!(self.writer, "{}", self.help.0).await?; //////////////////////////////////////////////////
         self.writer.write(self.help.0.as_bytes()).await?;
         self.writer.flush().await?;
 
@@ -494,7 +480,6 @@ where
     }
 
     async fn give_feedback(&mut self, value: &T) -> Result<(), std::io::Error> {
-        // write!(self.writer, "{}", (self.feedback)(value)).await?;//////////////////////////////////////////////////
         self.writer.write((self.feedback)(value).as_bytes()).await?;
         self.writer.flush().await?;
         Ok(())
@@ -530,7 +515,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     where
         F: Fn(&str) -> bool + Send + Sync + 'static,
     {
-        self.str_test_with_msg(str_test, "The input failed a test before being parsed.\n")
+        self.str_test_with_msg(str_test, "The input failed a test before being parsed.")
     }
 
     /// Add a test over the unparsed input and shows the message if an error occurs.
@@ -551,7 +536,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     pub fn length(self, exact_length: usize) -> Self {
         self.length_with_msg(
             exact_length,
-            format!("The input needs to have length exactly {}.\n", exact_length),
+            format!("The input needs to have length exactly {}.", exact_length),
         )
     }
 
@@ -569,7 +554,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     pub fn max_length(self, max_length: usize) -> Self {
         self.length_with_msg(
             max_length,
-            format!("The input needs to have length at most {}.\n", max_length),
+            format!("The input needs to have length at most {}.", max_length),
         )
     }
 
@@ -587,7 +572,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     pub fn min_length(self, min_length: usize) -> Self {
         self.length_with_msg(
             min_length,
-            format!("The input needs to have length at least {}.\n", min_length),
+            format!("The input needs to have length at least {}.", min_length),
         )
     }
 
@@ -624,6 +609,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
             str_tests: self.str_tests,
             parser: self.parser,
             tests: self.tests,
+            error_formatter: self.error_formatter,
             executor: self.executor,
             attempts: self.attempts,
             required: self.required,
@@ -642,10 +628,24 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
             str_tests: self.str_tests,
             parser: self.parser,
             tests: self.tests,
+            error_formatter: self.error_formatter,
             executor: self.executor,
             attempts: self.attempts,
             required: self.required,
         }
+    }
+
+    /// Change the way errors are displayed.
+    ///
+    /// # Remarks
+    ///
+    /// This can be useful if you want to change the default behaviour of appending a newline.
+    pub fn error_formatter<F>(mut self, error_formatter: F) -> Self
+    where
+        F: Fn(String) -> String + Send + Sync + 'static,
+    {
+        self.error_formatter = Arc::new(error_formatter);
+        self
     }
 
     /// Toggle the feedback from the parser.

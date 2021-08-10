@@ -41,7 +41,7 @@ Let me know if you find anything else, I will be happy to add it!
 
 Give only five seconds to the user to confirm something, and continue upon no input! (instead of keep waiting)
 
-```rust
+```rust,ignore
 use asking::error::Processing;
 use std::time::Duration;
 
@@ -106,5 +106,8 @@ Some crates are good to use together!
 Testing projects with user input can be challenging.
 
 - How to give input to Stdin and read from Stdout?
-  The easiest way is using the `assert_cmd` crate. Check out the example `testing`. For more, go to [Command line apps in Rust book](https://rust-cli.github.io/book/tutorial/testing.html).
+  The easiest way is using the `assert_cmd` crate. Check out
+  - Example `testing`.
+  - Folder `tests` of this repository.
+  - For more, go to [Command line apps in Rust book](https://rust-cli.github.io/book/tutorial/testing.html).
 
