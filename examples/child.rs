@@ -11,13 +11,13 @@ fn main() -> eyre::Result<()> {
 
     // Write all input
     // Note: the run has to end, so write all answers here!
-    cmd.write_stdin("no");
+    cmd.write_stdin("maybe...\nno");
 
     // Test the run
     let output = cmd.unwrap();
     assert_eq!(
-        output.stdout,
-        Vec::<u8>::from("Do you like testing? Oh no!")
+        std::str::from_utf8(&output.stdout)?,
+        "Do you like testing? Please use format y/n. Try again: Oh no!".to_string()
     );
 
     Ok(())
