@@ -43,8 +43,8 @@ pub struct QuestionBuilder<T, R, W> {
 /// # Constructor
 impl<T, R, W> QuestionBuilder<T, R, W>
 where
-    R: Read + Send + Sync,
-    W: Write + Send + Sync,
+    R: Read,
+    W: Write,
 {
     /// Constructs a new `QuestionBuilder<T, R, W>` with a default `preparser`.
     ///
@@ -79,10 +79,10 @@ where
 
 impl<T, R, W> QuestionBuilder<T, R, W>
 where
-    T: FromStr + Send + Sync,
-    <T as FromStr>::Err: Send + Sync + Error + 'static,
-    R: Read + Send + Sync,
-    W: Write + Send + Sync,
+    T: FromStr,
+    <T as FromStr>::Err: Error + Send + Sync + 'static,
+    R: Read,
+    W: Write,
 {
     /// Constructs a new `QuestionBuilder<T, R, W>` with a default `preparser`.
     /// The parser is given by the implementation of `FromStr`.
@@ -272,7 +272,10 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     /// Bound the number of possible attempts.
     ///
     /// The default value is `None`, which gives infinite attempts to the user.
-    pub fn attempts<O: Into<Option<usize>>>(mut self, attempts: O) -> Self {
+    pub fn attempts<O>(mut self, attempts: O) -> Self
+    where
+        O: Into<Option<usize>>,
+    {
         match attempts.into() {
             Some(attempts) => self.attempts_with_feedback(attempts, |_| "".to_string()),
             None => {
@@ -298,7 +301,10 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     /// # Remarks
     ///
     /// Default values are NOT tested, so make sure that it is a value that passes your tests!
-    pub fn default_value<S: Into<Option<T>>>(mut self, value: S) -> Self {
+    pub fn default_value<S>(mut self, value: S) -> Self
+    where
+        S: Into<Option<T>>,
+    {
         self.default = value.into();
         self
     }
@@ -525,19 +531,19 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     /// # Remarks
     ///
     /// There is a default message that you might want to overwrite with `str_test_with_msg`.
-    pub fn str_test(
-        self,
-        str_test: impl Fn(&str) -> bool + 'static + std::marker::Send + std::marker::Sync,
-    ) -> Self {
+    pub fn str_test<F>(self, str_test: F) -> Self
+    where
+        F: Fn(&str) -> bool + Send + Sync + 'static,
+    {
         self.str_test_with_msg(str_test, "The input failed a test before being parsed.\n")
     }
 
     /// Add a test over the unparsed input and shows the message if an error occurs.
-    pub fn str_test_with_msg(
-        self,
-        str_test: impl Fn(&str) -> bool + 'static + std::marker::Send + std::marker::Sync,
-        message: impl ToString + 'static + std::marker::Send + std::marker::Sync,
-    ) -> Self {
+    pub fn str_test_with_msg<F, M>(self, str_test: F, message: M) -> Self
+    where
+        F: Fn(&str) -> bool + Send + Sync + 'static,
+        M: ToString + Send + Sync + 'static,
+    {
         let str_test = move |s: &str| match str_test(s) {
             true => Ok(()),
             false => Err(Report::msg(message.to_string())),
@@ -556,11 +562,10 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 
     /// Tests that the input length is equal to `exact_length`.
     ///
-    pub fn length_with_msg(
-        self,
-        exact_length: usize,
-        message: impl ToString + 'static + std::marker::Send + std::marker::Sync,
-    ) -> Self {
+    pub fn length_with_msg<M>(self, exact_length: usize, message: M) -> Self
+    where
+        M: ToString + Send + Sync + 'static,
+    {
         self.str_test_with_msg(move |s: &str| s.len() == exact_length, message)
     }
 
@@ -575,11 +580,10 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 
     /// Tests that the input length is less or equal to `max_length`.
     ///
-    pub fn max_length_with_msg(
-        self,
-        max_length: usize,
-        message: impl ToString + 'static + std::marker::Send + std::marker::Sync,
-    ) -> Self {
+    pub fn max_length_with_msg<M>(self, max_length: usize, message: M) -> Self
+    where
+        M: ToString + Send + Sync + 'static,
+    {
         self.str_test_with_msg(move |s: &str| s.len() <= max_length, message)
     }
 
@@ -594,11 +598,10 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 
     /// Tests that the input length is greater or equal to `min_length`.
     ///
-    pub fn min_length_with_msg(
-        self,
-        min_length: usize,
-        message: impl ToString + 'static + std::marker::Send + std::marker::Sync,
-    ) -> Self {
+    pub fn min_length_with_msg<M>(self, min_length: usize, message: M) -> Self
+    where
+        M: ToString + Send + Sync + 'static,
+    {
         self.str_test_with_msg(move |s: &str| s.len() >= min_length, message)
     }
 
@@ -614,7 +617,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 
 /// # Advanced methods
 impl<T, R, W> QuestionBuilder<T, R, W> {
-    pub fn reader<R2: Read + Unpin>(self, other_reader: R2) -> QuestionBuilder<T, R2, W> {
+    pub fn reader<R2: Read>(self, other_reader: R2) -> QuestionBuilder<T, R2, W> {
         QuestionBuilder {
             reader: BufReader::new(other_reader),
             writer: self.writer,
@@ -632,7 +635,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
         }
     }
 
-    pub fn writer<W2: Write + Unpin>(self, other_writer: W2) -> QuestionBuilder<T, R, W2> {
+    pub fn writer<W2: Write>(self, other_writer: W2) -> QuestionBuilder<T, R, W2> {
         QuestionBuilder {
             reader: self.reader,
             writer: BufWriter::new(other_writer),

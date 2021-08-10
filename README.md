@@ -32,6 +32,7 @@ Ever wanted non-blocking user input? Here you are!
 ## Limitations
 
 - **Internal mutability of functions** - All functions are stored as `Arc<dyn Fn>`. This  allows both functions and closures, but it means that functions can not hold any mutable references (so no internal mutability).
+- **Send + Sync + 'static** - To allow asynchronous execution, at the end of the day, all parameters have to implement this traits. This way you can truly harness async execution of questions. If you manage to use something that does not implement these traits, then the future can only be executed synchronously. 
 - **Consuming methods** - Methods are consuming allowing one-line constructions, while making more difficult complex construction patterns. This is because of the existence of default values. Check out [C-BUILDER](https://rust-lang.github.io/api-guidelines/type-safety.html#c-builder).
 
 Let me know if you find anything else, I will be happy to add it!

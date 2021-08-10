@@ -1,11 +1,11 @@
 use crate::StdQuestionBuilder;
 use chrono::naive::NaiveDate;
-
+use std::{error::Error, str::FromStr};
 ///
-pub fn question<T: std::str::FromStr>() -> StdQuestionBuilder<T>
+pub fn question<T: FromStr>() -> StdQuestionBuilder<T>
 where
-    T: std::str::FromStr + Send + Sync,
-    <T as std::str::FromStr>::Err: Send + Sync + std::error::Error + 'static,
+    T: FromStr + Send + Sync,
+    <T as FromStr>::Err: Send + Sync + Error + 'static,
 {
     StdQuestionBuilder::default()
 }

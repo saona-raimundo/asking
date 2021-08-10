@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq)]
 pub enum Executor {
     None,
     Timeout(Duration),
