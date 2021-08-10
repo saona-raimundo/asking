@@ -101,12 +101,9 @@ Some crates are good to use together!
 
 ## FAQ
 
-(TODO)
-
 ### Testing
 
 Testing projects with user input can be challenging.
 
 - How to give input to Stdin and read from Stdout?
-  - https://doc.rust-lang.org/std/process/index.html
-  - https://stackoverflow.com/questions/21615188/how-to-send-input-to-a-program-through-stdin-in-rust/32069040
+  The easiest way is using the `assert_cmd` crate. Check out the [Command line apps in Rust book](https://rust-cli.github.io/book/tutorial/testing.html), or the example `child`. 

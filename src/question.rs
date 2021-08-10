@@ -420,7 +420,9 @@ where
         let mut input = String::new();
         if self.reader.read_line(&mut input).await? == 0 {
             // We reached EOF
+            // async_std::task::sleep(std::time::Duration::from_secs(1)).await;
             async_std::task::yield_now().await; // Giving back control
+
             self.writer
                 .write(("EOF".to_string() + "\n").as_bytes())
                 .await?;

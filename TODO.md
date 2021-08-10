@@ -1,5 +1,9 @@
 # TODO
 
+## BUG
+
+`take_input` should not `read_line`, but wait for input!
+
 ## Documentation
 
 - Add gifs as in [inqiure](https://crates.io/crates/inquire)
