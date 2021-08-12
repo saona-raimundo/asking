@@ -1,7 +1,12 @@
 use crate::StdQuestionBuilder;
 use chrono::naive::NaiveDate;
 use std::{error::Error, str::FromStr};
+
+/// Question for types implementing `FromStr` trait.
 ///
+/// # Remarks
+///
+/// For types that do not implement `FromStr`, prefer `StdQuestionBuilder::from(&parser)`.
 pub fn question<T: FromStr>() -> StdQuestionBuilder<T>
 where
     T: FromStr + Send + Sync,
@@ -57,12 +62,14 @@ where
     )
 }
 
+/// Date question.
 ///
+/// `NaiveDate` parses the `%Y-%m-%d` format.
 pub fn date() -> StdQuestionBuilder<NaiveDate> {
     StdQuestionBuilder::default()
 }
 
-///
+/// Text question.
 pub fn text() -> StdQuestionBuilder<String> {
     StdQuestionBuilder::default()
 }

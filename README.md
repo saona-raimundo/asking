@@ -27,6 +27,7 @@ Ever wanted non-blocking user input? Here you are!
 - **Default values** - Add a value for empty inputs.
 - **Standardized error handling** - You can manage errors!
 - **Feedback** - Display a final message depending on the accepted value.
+- **Extensive documentation** - If you do not think so, let me know!
 
 
 ## Limitations

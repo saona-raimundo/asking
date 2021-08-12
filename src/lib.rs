@@ -63,6 +63,7 @@
 #[cfg(doctest)]
 doc_comment::doctest!("../README.md");
 
+/// Errors while asking a question.
 pub mod error;
 mod pattern;
 mod question;
