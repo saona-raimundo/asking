@@ -12,7 +12,7 @@ description = """
 Build async prompts.
 """
 keywords = ["ask", "cli", "input", "prompt", "question"]
-categories = ["command-line-interface", "command-line-utilities", "data-structures", "encoding", "rust-patterns", "value-formatting"]
+categories = ["command-line-interface", "command-line-utilities", "encoding", "rust-patterns", "value-formatting"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
