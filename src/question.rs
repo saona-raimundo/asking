@@ -688,9 +688,9 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
     /// # Remarks
     ///
     /// Errors will NOT be displayed if they occur.
-    /// Check out [`parser_wiht_feedback`] if you want to display a message upon failure.
+    /// Check out [`parser_with_feedback`] if you want to display a message upon failure.
     ///
-    /// [`parser_wiht_feedback`]: #method.parser_wiht_feedback
+    /// [`parser_with_feedback`]: #method.parser_with_feedback
     pub fn parser<F>(mut self, parser: F) -> Self
     where
         F: Fn(&str) -> eyre::Result<T> + Send + Sync + 'static,
