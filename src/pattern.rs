@@ -23,6 +23,40 @@ pub fn yn() -> StdQuestionBuilder<bool> {
     })
 }
 
+/// Test if the value is inside an iterator
+///
+/// # Remarks
+///
+/// To prevent infinite loops, make sure `iterator` is finite.
+pub fn select<T, I>(iterator: I) -> StdQuestionBuilder<T>
+where
+    T: PartialEq + FromStr + Send + Sync + 'static,
+    <T as FromStr>::Err: Send + Sync + Error + 'static,
+    I: IntoIterator<Item = T> + 'static,
+{
+    select_with_msg(iterator, "Value is not one of the options.")
+}
+
+/// Test if the value is inside an iterator
+///
+/// # Remarks
+///
+/// To prevent infinite loops, make sure `iterator` is finite.
+pub fn select_with_msg<T, I, M>(iterator: I, message: M) -> StdQuestionBuilder<T>
+where
+    T: PartialEq + FromStr + Send + Sync + 'static,
+    <T as FromStr>::Err: Send + Sync + Error + 'static,
+    I: IntoIterator<Item = T> + 'static,
+    M: ToString + Send + Sync + 'static,
+{
+    let question = StdQuestionBuilder::default();
+    let options: Vec<T> = iterator.into_iter().collect();
+    question.test_with_msg(
+        move |value: &T| options.iter().any(|option| option == value),
+        message,
+    )
+}
+
 ///
 pub fn date() -> StdQuestionBuilder<NaiveDate> {
     StdQuestionBuilder::default()

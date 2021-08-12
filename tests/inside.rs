@@ -20,25 +20,3 @@ fn eof() -> eyre::Result<()> {
 
     Ok(())
 }
-
-// #[test]
-// fn input() -> eyre::Result<()> {
-//     let output = Command::cargo_bin("examples//inside")?
-//         .write_stdin("2200-01-01\n")
-//         .timeout(std::time::Duration::from_secs(1))
-//         .unwrap();
-
-//     let mut messages = std::str::from_utf8(&output.stdout)?.to_string();
-//     messages.truncate(42);
-
-//     assert_eq!(
-//         messages,
-//         "\
-//             Please input your awaited inside: \
-//             Thank you!\
-//         "
-//         .to_string()
-//     );
-
-//     Ok(())
-// }
