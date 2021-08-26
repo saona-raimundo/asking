@@ -375,7 +375,7 @@ impl<T, R, W> QuestionBuilder<T, R, W> {
 ///
 /// For ease of use, there are some built-in executors.
 impl<T, R, W> QuestionBuilder<T, R, W> {
-    /// set a maximum time for the user to finish answering the question.
+    /// Set a maximum time for the user to finish answering the question.
     ///
     /// # Remarks
     ///
@@ -427,7 +427,14 @@ where
     /// Feedback is displayed as given by the corresponding method.
     /// Error messages are displayed after applying [`error_formatter`].
     ///
+    /// More over, error messages are displayed through the [`eyre`] crate.
+    /// Therefore, you can further configure their display
+    /// (check out [`EyreHandler`]). [`error_formatter`]
+    /// is applied on top of displaying the error.
+    ///
     /// [`error_formatter`]: #method.error_formatter
+    /// [`eyre`]: https://crates.io/crates/eyre
+    /// [`EyreHandler`]: https://docs.rs/eyre/0.6.5/eyre/trait.EyreHandler.html
     pub async fn ask(self) -> Result<T, crate::error::Processing> {
         match self.executor {
             Executor::None => self.ask_loop().await,
@@ -435,6 +442,18 @@ where
                 async_std::future::timeout(duration, self.ask_loop()).await?
             }
         }
+    }
+
+    /// Synchronously gets input from the user.
+    ///
+    /// Convenience method for `async_std::task::block_on(self.ask())`.
+    ///
+    /// # Remarks
+    ///
+    /// Although this method goes against the goal of this crate,
+    /// it is useful for quick implementations.
+    pub fn ask_and_wait(self) -> Result<T, crate::error::Processing> {
+        async_std::task::block_on(self.ask())
     }
 
     async fn ask_loop(mut self) -> Result<T, crate::error::Processing> {

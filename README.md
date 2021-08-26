@@ -80,9 +80,16 @@ There are several crates for handling user input, I recommend checking them all 
 
 - [ask](https://crates.io/crates/ask) 
   A simple toolset for asking questions through the terminal.
+- [dialoguer](https://crates.io/crates/dialoguer)
+  A command line prompting library.
 - [inquire](https://crates.io/crates/inquire) 
   Library for building interactive prompts on terminals.
-
+- [promptly](https://crates.io/crates/promptly)
+  Simple, opinionated CLI prompting helper.
+- [requestty](https://crates.io/crates/requestty)
+  An easy-to-use collection of interactive cli prompts.
+- [rprompt](https://crates.io/crates/rprompt)
+  Prompt user input in console applications.
 - [question](https://crates.io/crates/question)
   Ask a question, what more could you want?
 - [read_input](https://crates.io/crates/read_input)

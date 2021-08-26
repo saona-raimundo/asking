@@ -2,7 +2,8 @@
 
 ## Examples
 
-- select_with_msg
+- parser_with_feedback
+  - Give an example and explain that eyre has to put into scope(?)
 - join for difficult task
 
 ## Documentation
