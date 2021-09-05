@@ -4,7 +4,7 @@
 //! - `attempts`
 //! - Error handling
 
-use asking::error::Processing;
+use asking::error::ProcessingError;
 
 fn main() {
     let result = async_std::task::block_on(
@@ -25,8 +25,10 @@ fn main() {
 
     match result {
         Ok(_) => println!("We are done here! Go and play!"),
-        Err(Processing::NoMoreAttempts) => eprintln!("You did not manage to answer the question."),
-        Err(Processing::Io { .. }) => eprintln!("Failed to read line."),
+        Err(ProcessingError::NoMoreAttempts) => {
+            eprintln!("You did not manage to answer the question.")
+        }
+        Err(ProcessingError::Io { .. }) => eprintln!("Failed to read line."),
         _ => unreachable!(),
     }
 }

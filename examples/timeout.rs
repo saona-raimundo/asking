@@ -4,7 +4,7 @@
 //! - `timeout`
 //! - Error handling
 
-use asking::error::Processing;
+use asking::error::ProcessingError;
 use std::time::Duration;
 
 fn main() {
@@ -27,10 +27,10 @@ fn main() {
     match result {
         Ok(true) => println!("Super!"),
         Ok(false) => println!("Okay, shutting down..."),
-        Err(Processing::Timeout { .. }) => {
+        Err(ProcessingError::Timeout { .. }) => {
             println!("\nI think you are not here, I will continue :)")
         }
-        Err(Processing::Io { .. }) => eprintln!("\nFailed to read line."),
+        Err(ProcessingError::Io { .. }) => eprintln!("\nFailed to read line."),
         _ => unreachable!(),
     }
 }

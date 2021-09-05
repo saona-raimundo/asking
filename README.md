@@ -43,7 +43,7 @@ Let me know if you find anything else, I will be happy to add it!
 Give only five seconds to the user to confirm something, and continue upon no input! (instead of keep waiting)
 
 ```rust,ignore
-use asking::error::Processing;
+use asking::error::ProcessingError;
 use std::time::Duration;
 
 let question = asking::yn()
@@ -55,7 +55,7 @@ let question = asking::yn()
 match async_std::task::block_on(question) { // we decide to just wait, at most five secs
     Ok(true) => println!("Super!"),
     Ok(false) => println!("Okay, shutting down..."),
-    Err(Processing::Timeout { .. }) => println!("I think you are not here, I will continue :)"), // Automatic decision!,
+    Err(ProcessingError::Timeout { .. }) => println!("I think you are not here, I will continue :)"), // Automatic decision!,
     _ => eprintln!("Error with questionnaire, try again later"),
 }
 ```

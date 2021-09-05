@@ -4,7 +4,7 @@ use thiserror::Error;
 ///
 /// [`ask`]: ../struct.QuestionBuilder.html#method.ask
 #[derive(Error, Debug)]
-pub enum Processing {
+pub enum ProcessingError {
     /// The user has no more attempts to answer a question.
     ///
     /// Related to the method [`attempts`].

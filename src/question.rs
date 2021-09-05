@@ -9,6 +9,8 @@ use core::{fmt::Debug, str::FromStr};
 use eyre::Report;
 use std::{error::Error, marker::Unpin, string::ToString, time::Duration};
 
+use crate::error::ProcessingError;
+
 mod executor;
 mod standard;
 pub use executor::Executor;
@@ -435,7 +437,7 @@ where
     /// [`error_formatter`]: #method.error_formatter
     /// [`eyre`]: https://crates.io/crates/eyre
     /// [`EyreHandler`]: https://docs.rs/eyre/0.6.5/eyre/trait.EyreHandler.html
-    pub async fn ask(self) -> Result<T, crate::error::Processing> {
+    pub async fn ask(self) -> Result<T, ProcessingError> {
         match self.executor {
             Executor::None => self.ask_loop().await,
             Executor::Timeout(duration) => {
@@ -452,11 +454,11 @@ where
     ///
     /// Although this method goes against the goal of this crate,
     /// it is useful for quick implementations.
-    pub fn ask_and_wait(self) -> Result<T, crate::error::Processing> {
+    pub fn ask_and_wait(self) -> Result<T, ProcessingError> {
         async_std::task::block_on(self.ask())
     }
 
-    async fn ask_loop(mut self) -> Result<T, crate::error::Processing> {
+    async fn ask_loop(mut self) -> Result<T, ProcessingError> {
         loop {
             self.check_attempts()?;
             self.write_message().await?;
@@ -483,9 +485,9 @@ where
         }
     }
 
-    fn check_attempts(&mut self) -> Result<(), crate::error::Processing> {
+    fn check_attempts(&mut self) -> Result<(), ProcessingError> {
         match self.attempts {
-            Some((0, _)) => Err(crate::error::Processing::NoMoreAttempts),
+            Some((0, _)) => Err(ProcessingError::NoMoreAttempts),
             _ => Ok(()),
         }
     }
@@ -509,15 +511,15 @@ where
         Ok(())
     }
 
-    async fn take_input(&mut self) -> Result<String, crate::error::Processing> {
+    async fn take_input(&mut self) -> Result<String, ProcessingError> {
         let mut input = String::new();
         if self.reader.read_line(&mut input).await? == 0 {
-            return Err(crate::error::Processing::Eof);
+            return Err(ProcessingError::Eof);
         }
         Ok(input)
     }
 
-    fn decrease_attempts(&mut self) -> Result<(), crate::error::Processing> {
+    fn decrease_attempts(&mut self) -> Result<(), ProcessingError> {
         if let Some((left_attempts, _)) = &mut self.attempts {
             *left_attempts -= 1;
         }

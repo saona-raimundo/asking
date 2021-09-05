@@ -5,7 +5,7 @@
 //! - `timeout`
 //! - Error handling
 
-use asking::error::Processing;
+use asking::error::ProcessingError;
 use std::time::Duration;
 
 fn main() {
@@ -19,7 +19,7 @@ fn main() {
     match async_std::task::block_on(ans) {
         Ok(true) => println!("Super!"),
         Ok(false) => println!("Okay, shutting down..."),
-        Err(Processing::Timeout { .. }) => {
+        Err(ProcessingError::Timeout { .. }) => {
             println!("I think you are not here, I will continue :)")
         }
         Err(_) => eprintln!("Error with questionnaire, try again later"),
