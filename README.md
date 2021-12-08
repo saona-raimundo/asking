@@ -119,3 +119,7 @@ Testing projects with user input can be challenging.
   - Folder `tests` of this repository.
   - For more, go to [Command line apps in Rust book](https://rust-cli.github.io/book/tutorial/testing.html).
 
+## For the reader
+
+Has this project been useful to you? How? :)
+Let me know through a github issue!
