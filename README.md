@@ -3,6 +3,7 @@
 [![License](https://img.shields.io/crates/l/asking)](https://github.com/saona-raimundo/asking)
 [![Docs](https://docs.rs/asking/badge.svg)](https://docs.rs/asking/)
 [![Crate](https://img.shields.io/crates/v/asking.svg)](https://crates.io/crates/asking)
+[![dependency status](https://deps.rs/crate/asking/latest/status.svg)](https://deps.rs/crate/asking)
 
 Build async prompts.
 
